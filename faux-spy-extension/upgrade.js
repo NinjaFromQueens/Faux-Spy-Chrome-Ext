@@ -67,34 +67,23 @@ yearlyOption.addEventListener('click', () => switchPlan('yearly'));
 async function startCheckout(plan) {
   console.log(`🚀 Starting ${plan} checkout...`);
   
-  const priceId = STRIPE_PRICES[plan];
-  
-  if (!priceId || priceId.includes('PLACEHOLDER')) {
-    alert(`Yearly plan coming soon! Please choose the monthly plan for now, or contact support to set up yearly billing.`);
+  if (plan === 'yearly' && STRIPE_PRICES.yearly.includes('PLACEHOLDER')) {
+    alert(`Yearly plan coming soon! Please choose the monthly plan for now.`);
     return;
   }
-  
+
   try {
-    // Get or create customer ID
-    let { customerId, userEmail } = await chrome.storage.local.get(['customerId', 'userEmail']);
-    
-    if (!customerId) {
-      // Generate unique customer ID
-      customerId = 'cus_' + Math.random().toString(36).substring(2, 15);
-      await chrome.storage.local.set({ customerId });
-    }
-    
+    const { userEmail } = await chrome.storage.local.get(['userEmail']);
+
     // Create checkout session via backend
-    const response = await fetch('https://ai-detector-backend-gamma.vercel.app/api/create-checkout', {
+    const response = await fetch('https://fauxspy.com/api/create-checkout', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        priceId,
-        customerId,
-        email: userEmail,
-        plan: plan // 'monthly' or 'yearly'
+        plan,
+        email: userEmail || undefined
       })
     });
     
@@ -103,18 +92,8 @@ async function startCheckout(plan) {
       throw new Error(`Checkout failed: ${error}`);
     }
     
-    const { sessionId, url } = await response.json();
-    
-    // Save session info
-    await chrome.storage.local.set({
-      pendingCheckout: {
-        sessionId,
-        priceId,
-        plan,
-        timestamp: Date.now()
-      }
-    });
-    
+    const { url } = await response.json();
+
     // Redirect to Stripe Checkout
     console.log('✅ Redirecting to Stripe Checkout...');
     window.location.href = url;
@@ -134,69 +113,15 @@ yearlyButton.addEventListener('click', () => startCheckout('yearly'));
 // ============================================================================
 
 async function checkPaymentStatus() {
+  // After checkout, Stripe redirects to fauxspy.com/success.html where the
+  // license key is emailed to the user. The user then enters it in Settings.
   const urlParams = new URLSearchParams(window.location.search);
-  const sessionId = urlParams.get('session_id');
-  const success = urlParams.get('success');
-  
-  if (success === 'true' && sessionId) {
-    console.log('✅ Payment successful! Session:', sessionId);
-    
-    try {
-      // Verify session and activate license
-      const response = await fetch('https://ai-detector-backend-gamma.vercel.app/api/verify-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to verify payment');
-      }
-      
-      const data = await response.json();
-      
-      // Save license info
-      const license = {
-        isPro: true,
-        plan: data.plan || 'monthly',
-        customerId: data.customerId,
-        subscriptionId: data.subscriptionId,
-        status: 'active',
-        activatedAt: Date.now(),
-        expiresAt: data.expiresAt
-      };
-      
-      await chrome.storage.local.set({ 
-        license,
-        pendingCheckout: null 
-      });
-      
-      // Show success message
-      showSuccessMessage(data.plan);
-      
-    } catch (error) {
-      console.error('❌ Verification error:', error);
-      alert('Payment successful but verification failed. Please contact support with your session ID: ' + sessionId);
-    }
-  } else if (success === 'false') {
+  const cancelled = urlParams.get('cancelled');
+
+  if (cancelled === 'true') {
     console.log('❌ Payment cancelled');
     alert('Payment was cancelled. No charges were made.');
   }
-}
-
-function showSuccessMessage(plan) {
-  const message = plan === 'yearly' 
-    ? '🎉 Welcome to Pro (Yearly)!\n\nYou now have unlimited scans for a full year!\n\nSaving you $20.88 compared to monthly billing.'
-    : '🎉 Welcome to Pro!\n\nYou now have unlimited scans and advanced features!';
-  
-  alert(message);
-  
-  // Redirect to popup after 2 seconds
-  setTimeout(() => {
-    window.close();
-  }, 2000);
 }
 
 // ============================================================================
