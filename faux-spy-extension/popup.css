@@ -1,0 +1,733 @@
+/* ============================================================================
+   Faux Spy v1.0 - Detective Noir Theme
+   Dark navy + Gold accents = Premium detective aesthetic
+   ============================================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Faux Spy Brand Colors */
+  --gold: #fbbf24;
+  --gold-dark: #d97706;
+  --gold-light: #fde68a;
+  
+  --noir-darkest: #0a0e1a;
+  --noir-dark: #0f1419;
+  --noir-medium: #1a1f2e;
+  --noir-card: #1e2536;
+  
+  --gradient-gold: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  --gradient-detective: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  
+  --border-subtle: rgba(251, 191, 36, 0.08);
+  --border-default: rgba(251, 191, 36, 0.15);
+  --border-strong: rgba(251, 191, 36, 0.3);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow-gold: 0 0 24px rgba(251, 191, 36, 0.25);
+  --shadow-glow-detective: 0 0 24px rgba(139, 92, 246, 0.3);
+}
+
+body {
+  width: 380px;
+  min-height: 600px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: 
+    radial-gradient(circle at 20% 0%, rgba(251, 191, 36, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 100%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+    var(--noir-darkest);
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+.container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ============================================================================
+   FAUX SPY HEADER
+   ============================================================================ */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+
+.logo {
+  width: 48px;
+  height: 48px;
+  background: var(--gradient-gold);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--noir-medium);
+  box-shadow: var(--shadow-glow-gold);
+  flex-shrink: 0;
+}
+
+.logo svg {
+  width: 32px;
+  height: 32px;
+}
+
+.header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.header-text h1 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: var(--gradient-gold);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 2px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--gold-light);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   CARDS
+   ============================================================================ */
+
+.card {
+  background: rgba(251, 191, 36, 0.02);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 14px;
+  transition: all 0.2s ease;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.card:hover {
+  border-color: var(--border-default);
+  background: rgba(251, 191, 36, 0.04);
+}
+
+/* ============================================================================
+   PRO CARD
+   ============================================================================ */
+
+.pro-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%);
+  border-color: var(--border-strong);
+}
+
+.pro-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--gradient-gold);
+  color: var(--noir-medium);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.pro-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.btn-manage {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--gradient-gold);
+  color: var(--noir-medium);
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-manage:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+}
+
+/* ============================================================================
+   USAGE CARD
+   ============================================================================ */
+
+.usage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.usage-label {
+  font-size: 11px;
+  color: var(--gold-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.usage-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.progress-bar {
+  height: 6px;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--gradient-gold);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+.btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: rgba(251, 191, 36, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.btn-upgrade {
+  background: var(--gradient-gold);
+  border: none;
+  color: var(--noir-medium);
+  font-weight: 700;
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.btn-upgrade:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(251, 191, 36, 0.4);
+  color: var(--noir-medium);
+}
+
+/* ============================================================================
+   SOCIAL INDICATOR
+   ============================================================================ */
+
+.social-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.social-indicator-icon {
+  font-size: 18px;
+}
+
+.social-indicator-name {
+  font-weight: 700;
+  color: #c4b5fd;
+}
+
+.social-indicator-text {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* ============================================================================
+   TIPS CARD - Detective Files Look
+   ============================================================================ */
+
+.tips-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(217, 119, 6, 0.04) 100%);
+  border-color: var(--border-default);
+}
+
+.tips-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.tips-content {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tips-content strong {
+  color: var(--gold-light);
+  font-size: 13px;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.tip-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gold-light);
+  margin-right: 2px;
+}
+
+/* ============================================================================
+   SCAN MODES
+   ============================================================================ */
+
+.mode-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.mode-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(251, 191, 36, 0.02);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.mode-btn:hover {
+  background: rgba(251, 191, 36, 0.05);
+  border-color: var(--border-default);
+}
+
+.mode-btn.active {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+}
+
+.mode-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.mode-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mode-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1px;
+}
+
+.mode-desc {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* ============================================================================
+   ACTION BUTTONS
+   ============================================================================ */
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-primary {
+  grid-column: 1 / -1;
+  background: var(--gradient-gold);
+  color: var(--noir-medium);
+  border: none;
+  font-weight: 700;
+  box-shadow: var(--shadow-glow-gold);
+  padding: 12px 16px;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(251, 191, 36, 0.5);
+  color: var(--noir-medium);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: rgba(251, 191, 36, 0.04);
+  font-size: 12px;
+  padding: 10px 12px;
+}
+
+/* ============================================================================
+   STATS - Detective Case Files
+   ============================================================================ */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 12px 8px;
+  background: rgba(251, 191, 36, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.stat-item:hover {
+  background: rgba(251, 191, 36, 0.06);
+  transform: translateY(-1px);
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  background: var(--gradient-gold);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 2px;
+  line-height: 1;
+}
+
+.stat-value.stat-ai {
+  background: var(--gradient-danger);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-value.stat-human {
+  background: var(--gradient-success);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   ACHIEVEMENTS - Detective Badges
+   ============================================================================ */
+
+.achievements-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.achievements-icon {
+  font-size: 14px;
+}
+
+.achievements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.achievement-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(251, 191, 36, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.achievement-row.unlocked {
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(217, 119, 6, 0.08) 100%);
+  border-color: var(--border-strong);
+}
+
+.achievement-row.unlocked:hover {
+  transform: translateX(2px);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.16) 0%, rgba(217, 119, 6, 0.12) 100%);
+}
+
+.ach-badge {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.ach-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1px;
+}
+
+.ach-desc {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.ach-status {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   FOOTER BRAND
+   ============================================================================ */
+
+.footer-brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 4px 4px 4px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+}
+
+.footer-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-style: italic;
+  font-family: 'Georgia', serif;
+}
+
+.footer-link {
+  font-size: 11px;
+  color: var(--gold);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: var(--gold-light);
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   TOAST
+   ============================================================================ */
+
+.toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 12px 24px;
+  background: var(--noir-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold-light);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  white-space: nowrap;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================================
+   SCROLLBAR
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--noir-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(251, 191, 36, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 191, 36, 0.6);
+}
+
+svg {
+  flex-shrink: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button {
+  font-family: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   v1.4: Pro Feature Lock
+   ============================================================================ */
+
+.mode-btn-pro {
+  position: relative;
+  cursor: pointer;
+}
+
+.pro-lock {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-left: 6px;
+  background: var(--gradient-gold);
+  color: var(--noir-medium);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.mode-btn-pro:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(217, 119, 6, 0.04) 100%) !important;
+  border-color: var(--gold) !important;
+}
+
+.mode-btn-pro:hover .pro-lock {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+}

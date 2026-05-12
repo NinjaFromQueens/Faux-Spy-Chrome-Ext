@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faux Spy - AI Image Detector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header with Faux Spy Branding -->
+    <header class="header">
+      <div class="logo">
+        <!-- Detective magnifying glass with FX (FauxSpy) -->
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <circle cx="17" cy="17" r="11" stroke="currentColor" stroke-width="3" fill="none"/>
+          <line x1="25" y1="25" x2="34" y2="34" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+          <text x="17" y="22" text-anchor="middle" font-size="11" font-weight="bold" fill="currentColor">FX</text>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1>Faux Spy</h1>
+        <p class="subtitle">🕵️ Spy on the fakes</p>
+      </div>
+    </header>
+
+    <!-- Pro Status -->
+    <div class="card pro-card" id="proCard" hidden>
+      <div class="pro-badge">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1l2 6h6l-5 4 2 6-5-4-5 4 2-6-5-4h6z"/>
+        </svg>
+        <span>SECRET AGENT</span>
+      </div>
+      <p class="pro-desc">Unlimited detections • Priority support</p>
+      <button class="btn-manage" id="manageBtn">Manage Subscription</button>
+    </div>
+
+    <!-- Free Tier Status -->
+    <div class="card usage-card" id="usageCard">
+      <div class="usage-header">
+        <span class="usage-label">Today's investigations</span>
+        <span class="usage-count"><span id="scansUsed">0</span> / <span id="scansLimit">20</span></span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <button class="btn btn-upgrade" id="upgradeBtn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1l2 6h6l-5 4 2 6-5-4-5 4 2-6-5-4h6z"/>
+        </svg>
+        <span>Become Secret Agent - $9.99/mo</span>
+      </button>
+    </div>
+
+    <!-- Social Media Indicator -->
+    <div class="social-indicator" id="socialIndicator" style="display: none;">
+      <span class="social-indicator-icon" id="socialIcon">🌐</span>
+      <div style="flex: 1;">
+        <div class="social-indicator-name" id="socialName">Social Media</div>
+        <div class="social-indicator-text" id="socialText">Stakeout in progress</div>
+      </div>
+    </div>
+
+    <!-- Quick Tips -->
+    <div class="card tips-card">
+      <div class="tips-icon">🔍</div>
+      <div class="tips-content">
+        <strong>Detective Toolkit:</strong>
+        <div class="tip-item">
+          <kbd>Hover</kbd> any image to investigate
+        </div>
+        <div class="tip-item">
+          <kbd>Ctrl</kbd> + Click for instant analysis
+        </div>
+        <div class="tip-item">
+          <strong>Right-click</strong> → "Investigate this image"
+        </div>
+      </div>
+    </div>
+
+    <!-- Scan Mode Selector -->
+    <div class="card scan-mode-card">
+      <div class="mode-header">🎯 Investigation Mode</div>
+      <div class="mode-buttons">
+        <button class="mode-btn active" data-mode="detective">
+          <span class="mode-icon">🕵️</span>
+          <div class="mode-info">
+            <div class="mode-name">Detective</div>
+            <div class="mode-desc">Hover & investigate</div>
+          </div>
+        </button>
+        <button class="mode-btn" data-mode="quick">
+          <span class="mode-icon">🚀</span>
+          <div class="mode-info">
+            <div class="mode-name">Stakeout</div>
+            <div class="mode-desc">Visible images</div>
+          </div>
+        </button>
+        <button class="mode-btn mode-btn-pro" data-mode="deep">
+          <span class="mode-icon">🔍</span>
+          <div class="mode-info">
+            <div class="mode-name">
+              Deep Dive
+              <span class="pro-lock">🔒 PRO</span>
+            </div>
+            <div class="mode-desc">Investigate every image — even hidden ones</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button class="btn btn-primary" id="scanBtn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M11.5 3.5a4 4 0 11-5 0 4 4 0 015 0zM9 11a6 6 0 100-12 6 6 0 000 12z"/>
+        </svg>
+        <span id="scanText">Investigate Page</span>
+      </button>
+
+      <button class="btn btn-secondary" id="clearBtn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M5 1a1 1 0 011-1h4a1 1 0 011 1v1h3a1 1 0 110 2h-1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V4H2a1 1 0 110-2h3V1z"/>
+        </svg>
+        <span>Clear Evidence</span>
+      </button>
+
+      <button class="btn btn-secondary" id="settingsBtn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 4.754a3.246 3.246 0 100 6.492 3.246 3.246 0 000-6.492zM5.754 8a2.246 2.246 0 114.492 0 2.246 2.246 0 01-4.492 0z"/>
+          <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 01-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 01-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 01.52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 011.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 011.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 01.52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 01-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 01-1.255-.52l-.094-.319z"/>
+        </svg>
+        <span>HQ Settings</span>
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="card stats-card">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="totalScanned">0</div>
+          <div class="stat-label">Cases</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value stat-ai" id="aiCount">0</div>
+          <div class="stat-label">Fakes Caught</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value stat-human" id="humanCount">0</div>
+          <div class="stat-label">Verified Real</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Achievements - Detective Theme -->
+    <div class="card achievements-card">
+      <div class="achievements-header">
+        <span class="achievements-icon">🏆</span>
+        <span class="achievements-title">Detective Badges</span>
+      </div>
+      <div class="achievements-list">
+        <div class="achievement-row" id="ach-firstCatch">
+          <span class="ach-badge">🥇</span>
+          <div class="ach-info">
+            <div class="ach-name">First Catch</div>
+            <div class="ach-desc">Bust your first faker</div>
+          </div>
+          <span class="ach-status">🔒</span>
+        </div>
+        <div class="achievement-row" id="ach-sharpEye">
+          <span class="ach-badge">👁️</span>
+          <div class="ach-info">
+            <div class="ach-name">Sharp Eye</div>
+            <div class="ach-desc">10 cases solved</div>
+          </div>
+          <span class="ach-status">🔒</span>
+        </div>
+        <div class="achievement-row" id="ach-aiHunter">
+          <span class="ach-badge">🎯</span>
+          <div class="ach-info">
+            <div class="ach-name">Faux Hunter</div>
+            <div class="ach-desc">50 fakes caught</div>
+          </div>
+          <span class="ach-status">🔒</span>
+        </div>
+        <div class="achievement-row" id="ach-masterDetective">
+          <span class="ach-badge">🕵️</span>
+          <div class="ach-info">
+            <div class="ach-name">Master Spy</div>
+            <div class="ach-desc">100 investigations</div>
+          </div>
+          <span class="ach-status">🔒</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Branding -->
+    <div class="footer-brand">
+      <span class="footer-text">Faux Spy v1.0</span>
+      <a href="https://fauxspy.com" target="_blank" class="footer-link">fauxspy.com</a>
+    </div>
+
+    <!-- Status Toast -->
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

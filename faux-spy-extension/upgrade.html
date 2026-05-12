@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Become a Secret Agent - Faux Spy</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      font-size: 60px;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      opacity: 0.9;
+    }
+
+    /* Pricing Toggle */
+    .pricing-toggle {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .toggle-option {
+      font-size: 16px;
+      font-weight: 600;
+      opacity: 0.7;
+      transition: opacity 0.3s;
+    }
+
+    .toggle-option.active {
+      opacity: 1;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 60px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 15px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+
+    .toggle-switch.yearly::after {
+      transform: translateX(30px);
+    }
+
+    .savings-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #ffd700, #ff6b6b);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+
+    /* Pricing Cards */
+    .plans {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .plan-card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(16px);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 32px;
+      transition: all 0.3s;
+    }
+
+    .plan-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .plan-card.recommended {
+      border-color: #ffd700;
+      background: rgba(255, 215, 0, 0.15);
+    }
+
+    .recommended-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #ffd700, #ffa500);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .plan-name {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .plan-price {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .plan-price-small {
+      font-size: 32px;
+    }
+
+    .plan-period {
+      font-size: 16px;
+      opacity: 0.8;
+      margin-bottom: 8px;
+    }
+
+    .plan-original {
+      font-size: 18px;
+      opacity: 0.6;
+      text-decoration: line-through;
+      margin-bottom: 16px;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin: 24px 0;
+    }
+
+    .plan-features li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .plan-features li:last-child {
+      border-bottom: none;
+    }
+
+    .feature-icon {
+      font-size: 20px;
+    }
+
+    .plan-button {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #ffd700, #ff6b6b);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+    }
+
+    .plan-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(255, 215, 0, 0.5);
+    }
+
+    .plan-button:active {
+      transform: translateY(0);
+    }
+
+    .plan-button.secondary {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+
+    .plan-button.secondary:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Comparison Table */
+    .comparison {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
+    }
+
+    .comparison h2 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 32px;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 16px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .comparison-table th {
+      font-weight: 700;
+      font-size: 14px;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    .comparison-table td:not(:first-child) {
+      text-align: center;
+    }
+
+    .check {
+      color: #10b981;
+      font-size: 24px;
+    }
+
+    .cross {
+      color: #ef4444;
+      font-size: 20px;
+      opacity: 0.5;
+    }
+
+    /* FAQ */
+    .faq {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 32px;
+    }
+
+    .faq h2 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 32px;
+    }
+
+    .faq-item {
+      margin-bottom: 24px;
+    }
+
+    .faq-question {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .faq-answer {
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 28px;
+      }
+
+      .plans {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-table {
+        font-size: 14px;
+      }
+
+      .comparison-table th,
+      .comparison-table td {
+        padding: 12px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">🔍✨</div>
+      <h1>🕵️ Become a Secret Agent</h1>
+      <p class="subtitle">Unlimited AI detection + advanced features</p>
+    </div>
+
+    <!-- Pricing Toggle -->
+    <div class="pricing-toggle">
+      <span class="toggle-option active" id="monthlyOption">Monthly</span>
+      <div class="toggle-switch" id="toggleSwitch"></div>
+      <span class="toggle-option" id="yearlyOption">Yearly <span class="savings-badge">SAVE 17%</span></span>
+    </div>
+
+    <!-- Pricing Plans -->
+    <div class="plans">
+      <!-- Free Plan -->
+      <div class="plan-card">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0</div>
+        <div class="plan-period">Forever free</div>
+        
+        <ul class="plan-features">
+          <li><span class="feature-icon">✅</span> 20 scans per day</li>
+          <li><span class="feature-icon">✅</span> Basic AI detection</li>
+          <li><span class="feature-icon">✅</span> All scan methods</li>
+          <li><span class="feature-icon">❌</span> No smart caching</li>
+          <li><span class="feature-icon">❌</span> No batch scanning</li>
+        </ul>
+        
+        <button class="plan-button secondary" disabled>Current Plan</button>
+      </div>
+
+      <!-- Pro Plan - Monthly -->
+      <div class="plan-card recommended" id="proMonthly">
+        <div class="recommended-badge">⭐ MOST POPULAR</div>
+        <div class="plan-name">Pro Monthly</div>
+        <div class="plan-price">$9.99</div>
+        <div class="plan-period">per month</div>
+        
+        <ul class="plan-features">
+          <li><span class="feature-icon">✅</span> Unlimited scans</li>
+          <li><span class="feature-icon">✅</span> Advanced AI detection</li>
+          <li><span class="feature-icon">✅</span> Smart caching (70% faster)</li>
+          <li><span class="feature-icon">✅</span> Batch scanning (50 images)</li>
+          <li><span class="feature-icon">✅</span> Priority support</li>
+          <li><span class="feature-icon">✅</span> No ads</li>
+        </ul>
+        
+        <button class="plan-button" id="monthlyButton">Start Monthly Plan</button>
+      </div>
+
+      <!-- Pro Plan - Yearly -->
+      <div class="plan-card recommended" id="proYearly" style="display: none;">
+        <div class="recommended-badge">🔥 BEST VALUE</div>
+        <div class="plan-name">Pro Yearly</div>
+        <div class="plan-price plan-price-small">$99</div>
+        <div class="plan-period">per year</div>
+        <div class="plan-original">$119.88 if paid monthly</div>
+        
+        <ul class="plan-features">
+          <li><span class="feature-icon">✅</span> Everything in Monthly</li>
+          <li><span class="feature-icon">✅</span> Save $20.88/year (17%)</li>
+          <li><span class="feature-icon">✅</span> 2 months FREE</li>
+          <li><span class="feature-icon">✅</span> Priority support</li>
+          <li><span class="feature-icon">✅</span> Early access features</li>
+          <li><span class="feature-icon">✅</span> No ads</li>
+        </ul>
+        
+        <button class="plan-button" id="yearlyButton">Start Yearly Plan</button>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="comparison">
+      <h2>Compare Plans</h2>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Free</th>
+            <th>Pro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Daily scans</td>
+            <td>5</td>
+            <td>Unlimited</td>
+          </tr>
+          <tr>
+            <td>AI detection accuracy</td>
+            <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span> Enhanced</td>
+          </tr>
+          <tr>
+            <td>Smart caching</td>
+            <td><span class="cross">✗</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Batch scanning</td>
+            <td><span class="cross">✗</span></td>
+            <td><span class="check">✓</span> 50 images</td>
+          </tr>
+          <tr>
+            <td>Confidence levels</td>
+            <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Priority support</td>
+            <td><span class="cross">✗</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Early access</td>
+            <td><span class="cross">✗</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- FAQ -->
+    <div class="faq">
+      <h2>Frequently Asked Questions</h2>
+      
+      <div class="faq-item">
+        <div class="faq-question">💳 What payment methods do you accept?</div>
+        <div class="faq-answer">We accept all major credit cards (Visa, Mastercard, American Express) via Stripe's secure payment processing.</div>
+      </div>
+      
+      <div class="faq-item">
+        <div class="faq-question">🔄 Can I cancel anytime?</div>
+        <div class="faq-answer">Yes! You can cancel your subscription at any time. You'll continue to have Pro access until the end of your billing period.</div>
+      </div>
+      
+      <div class="faq-item">
+        <div class="faq-question">💰 Is there a refund policy?</div>
+        <div class="faq-answer">We offer a 7-day money-back guarantee. If you're not satisfied, contact us within 7 days for a full refund.</div>
+      </div>
+      
+      <div class="faq-item">
+        <div class="faq-question">🎯 What's the difference between Monthly and Yearly?</div>
+        <div class="faq-answer">Both plans have the same features. Yearly saves you 17% ($20.88/year) and gives you 2 months free!</div>
+      </div>
+      
+      <div class="faq-item">
+        <div class="faq-question">📊 How accurate is the AI detection?</div>
+        <div class="faq-answer">Our detection uses Hive AI's industry-leading models with 85%+ accuracy. Pro users get enhanced detection with configurable sensitivity.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="upgrade.js"></script>
+</body>
+</html>
