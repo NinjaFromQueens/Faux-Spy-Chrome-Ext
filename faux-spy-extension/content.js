@@ -1,4 +1,7 @@
 // ============================================================================
+
+const DEBUG = false;
+const log = (...a) => { if (DEBUG) console.log(...a); };
 // AI Media Detector - v7.2 IMPROVED AI DETECTION
 // Fixed threshold logic, confidence levels, better accuracy
 // ============================================================================
@@ -202,15 +205,15 @@ const state = {
 chrome.storage.local.get(['aiSensitivity', 'scanMode', 'showResultPanel', 'stats', 'achievements'], (result) => {
   if (result.aiSensitivity) {
     state.sensitivity = result.aiSensitivity;
-    console.log(`🎯 AI Sensitivity: ${state.sensitivity} (${(CONFIG.thresholds[state.sensitivity] * 100)}%)`);
+    log(`🎯 AI Sensitivity: ${state.sensitivity} (${(CONFIG.thresholds[state.sensitivity] * 100)}%)`);
   }
   if (result.scanMode) state.scanMode = result.scanMode;
   if (result.showResultPanel !== undefined) state.showResultPanel = result.showResultPanel;
   if (result.stats) state.stats = { ...state.stats, ...result.stats };
   if (result.achievements) state.achievements = { ...state.achievements, ...result.achievements };
   
-  console.log('📊 v8.1 Stats:', state.stats);
-  console.log('🏆 v8.1 Achievements:', state.achievements);
+  log('📊 v8.1 Stats:', state.stats);
+  log('🏆 v8.1 Achievements:', state.achievements);
 });
 
 // Save stats and achievements
@@ -462,12 +465,14 @@ const WidgetPool = {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      console.log('🖱️ Widget button clicked via:', e.type);
-      
-      if (WidgetPool.currentImage) {
-        console.log('🎯 Scanning image:', WidgetPool.currentImage.src?.substring(0, 50));
+      log('🖱️ Widget button clicked via:', e.type);
+
+      // Save ref BEFORE hide() nullifies currentImage
+      const imgToScan = WidgetPool.currentImage;
+      if (imgToScan) {
+        log('🎯 Scanning image:', imgToScan.src?.substring(0, 50));
         WidgetPool.hide();
-        scanImage(WidgetPool.currentImage);
+        scanImage(imgToScan);
       } else {
         console.warn('⚠️ No current image to scan');
       }
@@ -482,7 +487,12 @@ const WidgetPool = {
     button.addEventListener('mouseup', handleClick, true);    // Method 5: Mouseup
     button.addEventListener('pointerdown', handleClick, true); // Method 6: Pointer
     
-    console.log('✅ Widget initialized with 6 click handlers');
+    // Cancel the hide timer when mouse enters the button widget itself
+    this.widget.addEventListener('mouseenter', () => {
+      clearTimeout(state.hideTimeout);
+    }, true);
+
+    log('✅ Widget initialized with 6 click handlers');
     return this.widget;
   },
 
@@ -541,6 +551,51 @@ const WidgetPool = {
 function getImageId(img) {
   if (!img) return '';
   return img.src || img.currentSrc || '';
+}
+
+// Returns the highest-quality URL available for an image.
+// Social media CDNs serve thumbnails in feeds — we upgrade before sending to the API
+// so detection accuracy matches what you'd get scanning the full-size image directly.
+function getBestImageUrl(img) {
+  if (!img) return '';
+
+  // srcset contains multiple sizes — pick the widest one (works for Instagram, most sites)
+  if (img.srcset) {
+    const best = img.srcset
+      .split(',')
+      .map(s => {
+        const parts = s.trim().split(/\s+/);
+        return { url: parts[0], width: parseInt(parts[1]) || 0 };
+      })
+      .filter(e => e.url && !e.url.startsWith('data:') && e.width > 0)
+      .sort((a, b) => b.width - a.width)[0];
+    // Only use srcset if it's meaningfully larger than a thumbnail
+    if (best && best.width >= 400) return best.url;
+  }
+
+  let url = img.src || img.currentSrc || '';
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return url;
+
+  try {
+    // X / Twitter: pbs.twimg.com/media/HASH?format=jpg&name=small → name=large
+    if (url.includes('pbs.twimg.com/media/')) {
+      const u = new URL(url);
+      const name = u.searchParams.get('name') || '';
+      if (name !== 'large' && name !== 'orig') {
+        u.searchParams.set('name', 'large');
+        return u.toString();
+      }
+    }
+
+    // Pinterest: /236x/ or /474x/ → /736x/
+    if (url.includes('pinimg.com/')) {
+      return url.replace(/\/(60x60_RS|60x|74x|136x136|170x|236x|474x)\//, '/736x/');
+    }
+  } catch (e) {
+    // URL parse failed — fall through to original
+  }
+
+  return url;
 }
 
 function isScannableImage(img) {
@@ -623,35 +678,39 @@ async function scanImage(img) {
     console.warn('⚠️ Scan called with null/undefined image');
     return;
   }
-  
+
   const imageId = getImageId(img);
-  
-  if (!imageId) {
+  // Upgrade to full-res URL before dedup check and API call.
+  // X feeds serve ?name=small, Pinterest /236x/, etc. — the low-res thumbnail
+  // causes false "Real" results. Using the large URL fixes detection accuracy.
+  const bestUrl = getBestImageUrl(img) || imageId;
+
+  if (!bestUrl) {
     console.warn('⚠️ Image has no src/currentSrc');
     return;
   }
-  
-  if (state.scannedImages.has(imageId)) {
-    console.log('✓ Already scanned:', imageId);
+
+  if (state.scannedImages.has(bestUrl)) {
+    log('✓ Already scanned:', bestUrl);
     return;
   }
-  
-  console.log('🔍 Starting scan for:', imageId);
-  state.scannedImages.add(imageId);
+
+  log('🔍 Starting scan for:', bestUrl);
+  state.scannedImages.add(bestUrl);
   showLoadingBadge(img);
-  
+
   try {
     const usageCheck = await checkUsageLimit();
-    
+
     if (!usageCheck.allowed) {
-      console.log('⚠️ Usage limit reached');
+      log('⚠️ Usage limit reached');
       removeLoadingBadge(img);
       showUpgradePrompt(img, usageCheck);
       return;
     }
-    
+
     const imageData = {
-      src: imageId,
+      src: bestUrl,
       width: img.naturalWidth || img.width,
       height: img.naturalHeight || img.height,
       alt: img.alt || '',
@@ -660,14 +719,14 @@ async function scanImage(img) {
       pageTitle: document.title
     };
     
-    console.log('📤 Sending to background script:', imageData);
+    log('📤 Sending to background script:', imageData);
     
     const result = await chrome.runtime.sendMessage({
       action: 'analyzeImage',
       imageData
     });
     
-    console.log('📥 Received result:', result);
+    log('📥 Received result:', result);
     
     removeLoadingBadge(img);
     
@@ -684,10 +743,10 @@ async function scanImage(img) {
         showAnimatedResultPanel(img, result);
       }
       
-      console.log('✅ Scan complete!');
+      log('✅ Scan complete!');
     } else if (result?.error === 'DAILY_LIMIT_REACHED') {
       // v1.5: Server-enforced daily limit reached
-      console.log('🚫 Daily limit reached (server-enforced)');
+      log('🚫 Daily limit reached (server-enforced)');
       removeLoadingBadge(img);
       showUpgradePrompt(img, {
         message: result.indicators?.[0] || '🔒 Daily limit reached',
@@ -720,8 +779,7 @@ async function checkUsageLimit() {
     await chrome.storage.local.set({ dailyScans: 0, lastResetDate: today });
   }
   
-  // v1.5: Use license limit (default 20) instead of hardcoded
-  const limit = license?.limits?.scansPerDay || 20;
+  const limit = license?.limits?.scansPerDay || 10;
   return {
     allowed: scans < limit,
     remaining: Math.max(0, limit - scans),
@@ -766,13 +824,13 @@ async function updateSessionStats(result) {
 function showLoadingBadge(img) {
   // Virtual images (background-image clicks) - skip badge, show panel only
   if (img._isVirtual) {
-    console.log('💡 Virtual image - skipping inline badge');
+    log('💡 Virtual image - skipping inline badge');
     return;
   }
   
   // Check if image is in DOM
   if (!img.parentNode) {
-    console.log('💡 Image not in DOM - skipping badge');
+    log('💡 Image not in DOM - skipping badge');
     return;
   }
   
@@ -812,7 +870,7 @@ function removeLoadingBadge(img) {
 function applyHighlight(img, result) {
   // Virtual images don't have parents - skip inline badge
   if (img._isVirtual || !img.parentNode) {
-    console.log('💡 Virtual image - showing result panel only');
+    log('💡 Virtual image - showing result panel only');
     return;
   }
   
@@ -821,8 +879,8 @@ function applyHighlight(img, result) {
     const confidence = getConfidenceLevel(result.aiProbability, result);
     const percentage = Math.round(result.aiProbability * 100);
     
-    console.log(`🎨 Creating badge: ${confidence.label} ${percentage}% (color: ${confidence.color})`);
-    console.log('📊 Full result:', result);
+    log(`🎨 Creating badge: ${confidence.label} ${percentage}% (color: ${confidence.color})`);
+    log('📊 Full result:', result);
     
     const badge = document.createElement('div');
     badge.className = `ai-badge ai-badge-${confidence.color}`;
@@ -858,16 +916,20 @@ function showError(img, message) {
     console.warn('Error:', message);
     return;
   }
-  
+
   try {
     const wrapper = getOrCreateWrapper(img);
     const badge = document.createElement('div');
     badge.className = 'ai-badge ai-badge-error';
-    badge.innerHTML = '<span>⚠️</span><span>Error</span>';
     badge.title = message;
+    badge.innerHTML = `
+      <span>⚠️</span>
+      <span>Error</span>
+      <a class="ai-badge-report" href="https://fauxspy.com/contact" target="_blank" rel="noopener" title="Report this issue to Faux Spy">↗</a>
+    `;
     wrapper.appendChild(badge);
-    
-    setTimeout(() => badge.remove(), 5000);
+
+    setTimeout(() => badge.remove(), 8000);
   } catch (e) {
     console.warn('Could not show error:', e);
   }
@@ -1061,7 +1123,7 @@ function clearAllHighlights() {
   // Instead, individual entries get GC'd when overlay is removed
   
   state.scannedImages.clear();
-  console.log('✨ All evidence cleared');
+  log('✨ All evidence cleared');
 }
 
 // ============================================================================
@@ -1078,7 +1140,7 @@ document.addEventListener('mouseenter', (e) => {
   const img = e.target;
   
   if (img.nodeName !== 'IMG' || !isScannableImage(img)) return;
-  if (state.scannedImages.has(getImageId(img))) return;
+  if (state.scannedImages.has(getBestImageUrl(img) || getImageId(img))) return;
   
   clearTimeout(state.hoverTimeout);
   
@@ -1090,12 +1152,13 @@ document.addEventListener('mouseenter', (e) => {
 document.addEventListener('mouseleave', (e) => {
   if (e.target.nodeName === 'IMG') {
     clearTimeout(state.hoverTimeout);
-    
-    setTimeout(() => {
+
+    // Use state.hideTimeout so the widget's mouseenter can cancel it
+    state.hideTimeout = setTimeout(() => {
       if (!WidgetPool.widget?.matches(':hover')) {
         WidgetPool.hide();
       }
-    }, 100);
+    }, 200); // 200ms gives button clicks time to register
   }
 }, true);
 
@@ -1154,20 +1217,20 @@ function findImageFromTarget(target) {
 
 // Multiple event handlers for maximum reliability
 function setupCtrlClickHandlers() {
-  console.log('🎯 Setting up bulletproof Ctrl+Click handlers');
+  log('🎯 Setting up bulletproof Ctrl+Click handlers');
   
   // The handler function
   const ctrlClickHandler = (e) => {
     // Check for Ctrl/Cmd key
     if (!e.ctrlKey && !e.metaKey) return;
     
-    console.log(`🖱️ ${e.type} with Ctrl/Cmd detected`);
+    log(`🖱️ ${e.type} with Ctrl/Cmd detected`);
     
     // Find image using comprehensive search
     const img = findImageFromTarget(e.target);
     
     if (img) {
-      console.log('🎯 Found image:', img.src?.substring(0, 60));
+      log('🎯 Found image:', img.src?.substring(0, 60));
       
       // STOP everything - prevent Instagram modal, etc.
       e.preventDefault();
@@ -1179,7 +1242,7 @@ function setupCtrlClickHandlers() {
       
       return false;
     } else {
-      console.log('⚠️ No image found at click target');
+      log('⚠️ No image found at click target');
     }
   };
   
@@ -1192,7 +1255,7 @@ function setupCtrlClickHandlers() {
     
     const img = findImageFromTarget(e.target);
     if (img) {
-      console.log('🖱️ mousedown with Ctrl detected on image');
+      log('🖱️ mousedown with Ctrl detected on image');
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -1209,7 +1272,7 @@ function setupCtrlClickHandlers() {
     
     const img = findImageFromTarget(e.target);
     if (img) {
-      console.log('🖱️ pointerdown with Ctrl detected on image');
+      log('🖱️ pointerdown with Ctrl detected on image');
       e.preventDefault();
       e.stopPropagation();
       // Don't stopImmediatePropagation here - let click handler also fire
@@ -1229,7 +1292,7 @@ function setupCtrlClickHandlers() {
     
     for (const el of elementsAtPoint) {
       if (el.tagName === 'IMG' && isScannableImage(el)) {
-        console.log('🎯 Found image via elementsFromPoint:', el.src?.substring(0, 60));
+        log('🎯 Found image via elementsFromPoint:', el.src?.substring(0, 60));
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -1250,7 +1313,7 @@ function setupCtrlClickHandlers() {
           Object.defineProperty(virtualImg, 'naturalHeight', { value: rect.height });
           
           if (rect.width >= 100 && rect.height >= 100) {
-            console.log('🎯 Found background-image element');
+            log('🎯 Found background-image element');
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
@@ -1262,7 +1325,7 @@ function setupCtrlClickHandlers() {
     }
   }, true);
   
-  console.log('✅ Ctrl+Click handlers setup complete (5 methods)');
+  log('✅ Ctrl+Click handlers setup complete (5 methods)');
 }
 
 // Setup handlers immediately
@@ -1306,12 +1369,12 @@ const imageObserver = new IntersectionObserver((entries) => {
 // ============================================================================
 
 function initializeDetector() {
-  console.log('🚀 AI Detector v7.2 - Improved AI Detection');
-  console.log(`🎯 Sensitivity: ${state.sensitivity} (${(CONFIG.thresholds[state.sensitivity] * 100)}% threshold)`);
-  console.log('💡 Hover, Ctrl+Click, or Right-Click to scan');
+  log('🚀 AI Detector v7.2 - Improved AI Detection');
+  log(`🎯 Sensitivity: ${state.sensitivity} (${(CONFIG.thresholds[state.sensitivity] * 100)}% threshold)`);
+  log('💡 Hover, Ctrl+Click, or Right-Click to scan');
   
   const images = document.querySelectorAll('img');
-  console.log(`📊 Found ${images.length} images - observing visible ones`);
+  log(`📊 Found ${images.length} images - observing visible ones`);
   
   images.forEach(img => {
     if (isScannableImage(img)) {
@@ -1341,7 +1404,7 @@ function initializeDetector() {
   });
   
   WidgetPool.init();
-  console.log('✅ Initialized - Ready to scan!');
+  log('✅ Initialized - Ready to scan!');
 }
 
 // ============================================================================
@@ -1350,50 +1413,72 @@ function initializeDetector() {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'scanVisible') {
-    // v1.1: Smart scanning that waits for lazy-loaded images
     const platform = detectSocialPlatform();
     let images;
-    
+
     if (platform) {
-      console.log(`🌐 Detected social media platform: ${platform.name}`);
+      log(`🌐 Detected social media platform: ${platform.name}`);
       images = getAllScannableImages()
-        .filter(img => !state.scannedImages.has(getImageId(img)));
+        .filter(img => !state.scannedImages.has(getBestImageUrl(img) || getImageId(img)));
     } else {
       images = Array.from(document.querySelectorAll('img'))
         .filter(img => isScannableImage(img))
-        .filter(img => !state.scannedImages.has(getImageId(img)));
+        .filter(img => !state.scannedImages.has(getBestImageUrl(img) || getImageId(img)));
     }
-    
-    // v1.1: Only scan images currently in viewport (not far below)
+
+    // Deep Dive (Pro): scan every image on the page including off-screen/hidden ones
+    if (state.scanMode === 'deep') {
+      // For hidden images, check natural dimensions instead of rendered rect
+      const deepImages = Array.from(document.querySelectorAll('img')).filter(img => {
+        const src = img.src || img.currentSrc || '';
+        if (!src || src.startsWith('data:') || src.startsWith('blob:')) return false;
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        return w >= CONFIG.minImageSize && h >= CONFIG.minImageSize;
+      }).filter(img => !state.scannedImages.has(getBestImageUrl(img) || getImageId(img)));
+
+      const toScan = deepImages.slice(0, CONFIG.maxBatchSize * 5);
+      log(`🔬 [DEEP] Scanning ${toScan.length} images (including off-screen)`);
+
+      if (toScan.length === 0) {
+        sendResponse({ scanned: 0, total: 0, message: 'No unscanned images found', mode: 'deep' });
+        return true;
+      }
+
+      Promise.all(toScan.map(img => scanImage(img)))
+        .then(() => sendResponse({ scanned: toScan.length, total: toScan.length, mode: 'deep', platform: platform?.name }))
+        .catch(err => sendResponse({ error: err.message }));
+      return true;
+    }
+
+    // Detective / Quick: only scan viewport images
     const viewportHeight = window.innerHeight;
     const inViewportImages = images.filter(img => {
       const rect = img.getBoundingClientRect();
-      // Image must be at least partially in viewport, with 100px buffer
       return rect.top < viewportHeight + 100 && rect.bottom > -100;
     });
-    
-    // Take batch
+
     const toScan = inViewportImages.slice(0, CONFIG.maxBatchSize);
-    
+
     if (toScan.length === 0) {
-      sendResponse({ 
-        scanned: 0, 
+      sendResponse({
+        scanned: 0,
         total: 0,
         message: images.length > 0 ? 'Scroll to load more images' : 'No images found'
       });
-      return;
+      return true;
     }
-    
-    console.log(`🔍 Investigating ${toScan.length} of ${inViewportImages.length} visible images`);
-    
+
+    log(`🔍 Investigating ${toScan.length} of ${inViewportImages.length} visible images`);
+
     Promise.all(toScan.map(img => scanImage(img)))
-      .then(() => sendResponse({ 
-        scanned: toScan.length, 
-        total: toScan.length, 
-        platform: platform?.name 
+      .then(() => sendResponse({
+        scanned: toScan.length,
+        total: toScan.length,
+        platform: platform?.name
       }))
       .catch(err => sendResponse({ error: err.message }));
-    
+
     return true;
   }
   
@@ -1405,7 +1490,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle sensitivity change from settings
   if (request.action === 'sensitivityChanged') {
     state.sensitivity = request.sensitivity;
-    console.log(`🎯 Sensitivity updated: ${state.sensitivity}`);
+    log(`🎯 Sensitivity updated: ${state.sensitivity}`);
     sendResponse({ success: true });
   }
   
@@ -1447,11 +1532,6 @@ function showAnimatedResultPanel(img, result) {
   // Get image URL for sharing
   const imageUrl = img ? (img.src || img.currentSrc || '') : '';
   const imageName = imageUrl ? imageUrl.split('/').pop().split('?')[0].substring(0, 50) : 'Unknown image';
-  
-  // Store result on image for later reference
-  if (img) {
-    img.dataset.lastResult = JSON.stringify(result);
-  }
   
   // Create panel
   const panel = document.createElement('div');
@@ -1812,7 +1892,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'setScanMode') {
     state.scanMode = message.mode;
     chrome.storage.local.set({ scanMode: message.mode });
-    console.log('🎯 Scan mode changed to:', message.mode);
+    log('🎯 Scan mode changed to:', message.mode);
     sendResponse({ success: true });
     return true;
   }
@@ -1825,7 +1905,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-console.log('✅ AI Detector v8.1 - All features loaded');
+log('✅ AI Detector v8.1 - All features loaded');
 
 // ============================================================================
 // v8.4: DRAG FUNCTIONALITY FOR RESULT PANEL
@@ -1876,7 +1956,7 @@ function makeDraggable(panel) {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🖱️ Started dragging panel');
+    log('🖱️ Started dragging panel');
   };
   
   // Mouse move - update position
@@ -1924,7 +2004,7 @@ function makeDraggable(panel) {
       lastPanelPosition: { left: pos.left, top: pos.top }
     });
     
-    console.log('🖱️ Stopped dragging panel');
+    log('🖱️ Stopped dragging panel');
   };
   
   // Attach handlers
@@ -2008,7 +2088,7 @@ function makeDraggable(panel) {
     }
   });
   
-  console.log('✅ Panel is now draggable');
+  log('✅ Panel is now draggable');
 }
 
 // ============================================================================
@@ -2095,13 +2175,13 @@ function watchImageSrcChanges(img, callback) {
 async function scanImageWhenReady(img) {
   // Check if image is ready
   if (!img.complete || img.naturalWidth <= 10) {
-    console.log('⏳ Waiting for image to load:', img.src?.substring(0, 60));
+    log('⏳ Waiting for image to load:', img.src?.substring(0, 60));
     
     // Wait for it to load (with timeout)
     const loaded = await waitForImageLoad(img, 3000);
     
     if (!loaded) {
-      console.log('⚠️ Image did not load in time:', img.src?.substring(0, 60));
+      log('⚠️ Image did not load in time:', img.src?.substring(0, 60));
       return null;
     }
   }
@@ -2110,4 +2190,4 @@ async function scanImageWhenReady(img) {
   return scanImage(img);
 }
 
-console.log('🕵️ Faux Spy v1.1 ready - non-invasive overlay system active');
+log('🕵️ Faux Spy v1.1 ready - non-invasive overlay system active');

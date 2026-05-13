@@ -1,4 +1,7 @@
 // ============================================================================
+
+const DEBUG = false;
+const log = (...a) => { if (DEBUG) console.log(...a); };
 // Popup Script - Optimized v7.0
 // Cached DOM, Better Performance, Modern UX
 // ============================================================================
@@ -62,7 +65,7 @@ const state = {
   isScanning: false,
   license: null,
   stats: { total: 0, ai: 0, human: 0 },
-  usage: { used: 0, limit: 5 }
+  usage: { used: 0, limit: 10 }
 };
 
 // ============================================================================
@@ -142,8 +145,7 @@ async function fetchLicense() {
   const today = new Date().toDateString();
   const used = (lastResetDate === today) ? (dailyScans || 0) : 0;
   
-  // v1.4.1: Use actual license limit instead of hardcoded 5
-  const dailyLimit = license?.limits?.scansPerDay || 20;
+  const dailyLimit = license?.limits?.scansPerDay || 10;
   
   const data = {
     license: license || { isPro: false, plan: 'free' },
@@ -272,7 +274,7 @@ function handleManage() {
 // ============================================================================
 
 async function init() {
-  console.log('🕵️ Faux Spy v1.0 initialized');
+  log('🕵️ Faux Spy v1.0 initialized');
   
   // Cache DOM elements
   DOM.cache();
@@ -318,7 +320,7 @@ async function init() {
         chrome.tabs.sendMessage(tab.id, { type: 'setScanMode', mode }).catch(() => {});
       }
       
-      console.log('🎯 Mode switched to:', mode);
+      log('🎯 Mode switched to:', mode);
       UI.showToast(`Switched to ${btn.querySelector('.mode-name').textContent.replace(/🔒 PRO/g, '').trim()}`, 2000);
     });
   });
@@ -366,7 +368,7 @@ async function init() {
     UI.showToast('⚙️ Configure API keys in Settings', 5000);
   }
   
-  console.log('✅ Popup ready');
+  log('✅ Popup ready');
 }
 
 // ============================================================================
@@ -420,9 +422,9 @@ async function detectAndDisplaySocialPlatform() {
         if (text) text.textContent = platform.text;
       }
       
-      console.log('🌐 Social platform detected:', platform.name);
+      log('🌐 Social platform detected:', platform.name);
     }
   } catch (error) {
-    console.log('Could not detect platform:', error);
+    log('Could not detect platform:', error);
   }
 }

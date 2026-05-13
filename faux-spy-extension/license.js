@@ -1,4 +1,7 @@
 // License Management Module v1.6
+
+const DEBUG = false;
+const log = (...a) => { if (DEBUG) console.log(...a); };
 // Handles license activation, validation, and Pro status
 // Connects to fauxspy.com/api/validate-license
 
@@ -35,7 +38,7 @@ async function activateLicense(licenseKey) {
   }
   
   try {
-    console.log('🔐 Activating license:', cleanKey);
+    log('🔐 Activating license:', cleanKey);
     
     const response = await fetch(`${BACKEND_URL}/api/validate-license`, {
       method: 'POST',
@@ -80,7 +83,7 @@ async function activateLicense(licenseKey) {
       lastLicenseCheck: Date.now()
     });
     
-    console.log('✅ License activated! Plan:', data.plan);
+    log('✅ License activated! Plan:', data.plan);
     
     return {
       success: true,
@@ -104,7 +107,7 @@ async function deactivateLicense() {
     license: getDefaultFreeLicense(),
     lastLicenseCheck: Date.now()
   });
-  console.log('🔓 License deactivated, reverted to free tier');
+  log('🔓 License deactivated, reverted to free tier');
 }
 
 // ============================================================================
@@ -157,7 +160,7 @@ async function revalidateLicense() {
       lastLicenseCheck: Date.now()
     });
     
-    console.log('✅ License still valid, refreshed');
+    log('✅ License still valid, refreshed');
     return updatedLicense;
     
   } catch (error) {
@@ -188,10 +191,9 @@ async function getLicense() {
     return freeLicense;
   }
   
-  // v1.4.1 MIGRATION: Auto-upgrade old cached licenses with 5-scan limit
-  if (license && !license.isPro && license.limits && license.limits.scansPerDay < 20) {
-    console.log('🔧 [MIGRATION] Upgrading from', license.limits.scansPerDay, 'to 20 scans/day');
-    license.limits.scansPerDay = 20;
+  // Migration: normalize free tier to current 10 scans/day
+  if (license && !license.isPro && license.limits && license.limits.scansPerDay !== 10) {
+    license.limits.scansPerDay = 10;
     await chrome.storage.local.set({ license });
   }
   
@@ -199,7 +201,7 @@ async function getLicense() {
   const isStale = !lastLicenseCheck || (Date.now() - lastLicenseCheck) > LICENSE_RECHECK_INTERVAL;
   
   if (license.isPro && isStale) {
-    console.log('🔄 Pro license cache stale, revalidating...');
+    log('🔄 Pro license cache stale, revalidating...');
     return await revalidateLicense();
   }
   
@@ -236,7 +238,7 @@ async function canScan() {
     scans = 0;
   }
   
-  const limit = license.limits?.scansPerDay || 20;
+  const limit = license.limits?.scansPerDay || 10;
   const remaining = Math.max(0, limit - scans);
   
   return {
@@ -275,7 +277,7 @@ function getDefaultFreeLicense() {
     isPro: false,
     plan: 'free',
     limits: {
-      scansPerDay: 20,
+      scansPerDay: 10,
       caching: false,
       batchScanning: false,
       maxBatchSize: 0,

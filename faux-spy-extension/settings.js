@@ -1,4 +1,7 @@
 // ============================================================================
+
+const DEBUG = false;
+const log = (...a) => { if (DEBUG) console.log(...a); };
 // Faux Spy v1.3 Settings Page
 // Primary: Sightengine (recommended)
 // Secondary: Hive AI (legacy support)
@@ -85,7 +88,7 @@ async function loadSettings() {
     updateStats(data.sessionStats);
   }
   
-  console.log('✅ Settings loaded');
+  log('✅ Settings loaded');
 }
 
 // ============================================================================
@@ -170,9 +173,9 @@ async function testSightengine() {
     
     const apiUrl = `https://api.sightengine.com/1.0/check.json?${params.toString()}`;
     
-    console.log('🧪 [TEST] Calling Sightengine API directly...');
-    console.log('🧪 [TEST] API user:', apiUser);
-    console.log('🧪 [TEST] API secret (first 8 chars):', apiSecret.substring(0, 8) + '...');
+    log('🧪 [TEST] Calling Sightengine API directly...');
+    log('🧪 [TEST] API user:', apiUser);
+    log('🧪 [TEST] API secret (first 8 chars):', apiSecret.substring(0, 8) + '...');
     
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -180,8 +183,8 @@ async function testSightengine() {
     });
     
     const responseText = await response.text();
-    console.log('🧪 [TEST] HTTP status:', response.status);
-    console.log('🧪 [TEST] Raw response:', responseText);
+    log('🧪 [TEST] HTTP status:', response.status);
+    log('🧪 [TEST] Raw response:', responseText);
     
     let data;
     try {
@@ -598,7 +601,7 @@ if (deactivateLicenseBtn) {
       isPro: false,
       plan: 'free',
       limits: {
-        scansPerDay: 20,
+        scansPerDay: 10,
         caching: false,
         batchScanning: false,
         maxBatchSize: 0

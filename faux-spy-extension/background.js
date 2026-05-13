@@ -1,9 +1,12 @@
 // Background service worker
 
+const DEBUG = false;
+const log = (...a) => { if (DEBUG) console.log(...a); };
+
 // v1.6.1: Import license management module
 try {
   importScripts('license.js');
-  console.log('✅ License module loaded');
+  log('✅ License module loaded');
 } catch (e) {
   console.error('Failed to load license.js:', e);
 }
@@ -25,7 +28,7 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ['image']
   });
   
-  console.log('🕵️ Faux Spy installed - Context menu created');
+  log('🕵️ Faux Spy installed - Context menu created');
   
   // v1.6.1: First-run initialization (no hardcoded credentials!)
   chrome.storage.local.get(['userId', 'license'], async (result) => {
@@ -33,7 +36,7 @@ chrome.runtime.onInstalled.addListener(() => {
     if (!result.userId) {
       const userId = 'fs_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
       await chrome.storage.local.set({ userId });
-      console.log('🆔 Created user ID:', userId);
+      log('🆔 Created user ID:', userId);
     }
     
     // Set default free license if not exists
@@ -42,7 +45,7 @@ chrome.runtime.onInstalled.addListener(() => {
         isPro: false,
         plan: 'free',
         limits: {
-          scansPerDay: 20,
+          scansPerDay: 10,
           caching: false,
           batchScanning: false,
           maxBatchSize: 0
@@ -52,7 +55,7 @@ chrome.runtime.onInstalled.addListener(() => {
         license: defaultLicense,
         lastLicenseCheck: Date.now()
       });
-      console.log('✅ Free tier initialized - 20 scans/day');
+      log('✅ Free tier initialized - 20 scans/day');
     }
   });
 });
@@ -62,9 +65,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.license) {
     const newLicense = changes.license.newValue;
     if (newLicense?.isPro) {
-      console.log('✨ Pro license activated:', newLicense.plan);
+      log('✨ Pro license activated:', newLicense.plan);
     } else if (changes.license.oldValue?.isPro) {
-      console.log('🔓 Pro license deactivated');
+      log('🔓 Pro license deactivated');
     }
   }
 });
@@ -77,7 +80,7 @@ async function checkLicense() {
   // No-op - license.js handles this now
   // Kept to prevent errors from old code paths
   const { license } = await chrome.storage.local.get('license');
-  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 20 } };
+  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 10 } };
 }
 
 // Listen for messages from content script
@@ -92,7 +95,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'checkAI') {
-    console.log('🖱️ Context menu clicked for:', info.srcUrl);
+    log('🖱️ Context menu clicked for:', info.srcUrl);
     
     // Analyze the image
     const result = await processAnalysis({ src: info.srcUrl });
@@ -133,7 +136,7 @@ async function processQueue() {
   
   if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
     const delay = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-    console.log(`⏱️ [RATE LIMIT] Waiting ${delay}ms...`);
+    log(`⏱️ [RATE LIMIT] Waiting ${delay}ms...`);
     await new Promise(resolve => setTimeout(resolve, delay));
   }
   
@@ -159,10 +162,22 @@ async function processQueue() {
 // v1.5: Backend proxy URL - hides Sightengine API key
 const FAUXSPY_API_BASE = 'https://fauxspy.com';
 
+function getPlatformDisplayName(host) {
+  host = (host || '').toLowerCase();
+  if (host.includes('instagram') || host.includes('cdninstagram')) return 'Instagram';
+  if (host.includes('twitter') || host.includes('x.com') || host.includes('twimg')) return 'X (Twitter)';
+  if (host.includes('facebook') || host.includes('fbcdn')) return 'Facebook';
+  if (host.includes('pinterest') || host.includes('pinimg')) return 'Pinterest';
+  if (host.includes('reddit') || host.includes('redd.it')) return 'Reddit';
+  if (host.includes('tiktok')) return 'TikTok';
+  if (host.includes('linkedin') || host.includes('licdn')) return 'LinkedIn';
+  return null;
+}
+
 async function processAnalysis(request) {
   // Extract imageData from request
   const imageData = request.imageData || request;
-  console.log('🔍 Processing analysis for:', imageData.src?.substring(0, 50));
+  log('🔍 Processing analysis for:', imageData.src?.substring(0, 50));
   
   // v1.5: Try Faux Spy proxy backend FIRST (uses our Sightengine key)
   // Falls back to user's own Sightengine credentials if proxy fails
@@ -182,17 +197,17 @@ async function processAnalysis(request) {
   ]);
   
   // STEP 1: Try Faux Spy proxy backend (the new way)
-  console.log('🎯 [FAUXSPY] Calling backend proxy...');
+  log('🎯 [FAUXSPY] Calling backend proxy...');
   const proxyResult = await analyzeWithProxy(imageData, license);
   
   if (proxyResult.method === 'sightengine_api') {
-    console.log('✅ [FAUXSPY] Backend detection succeeded');
+    log('✅ [FAUXSPY] Backend detection succeeded');
     return proxyResult;
   }
   
   // If proxy hit daily limit, return that specific result (don't fall back)
   if (proxyResult.error === 'DAILY_LIMIT_REACHED') {
-    console.log('🚫 [FAUXSPY] Daily limit reached');
+    log('🚫 [FAUXSPY] Daily limit reached');
     return proxyResult;
   }
   
@@ -200,11 +215,11 @@ async function processAnalysis(request) {
   
   // STEP 2: Fallback - User's own Sightengine credentials (if they added any)
   if (sightengineApiUser && sightengineApiSecret) {
-    console.log('🎯 [SIGHTENGINE] Trying user-provided credentials...');
+    log('🎯 [SIGHTENGINE] Trying user-provided credentials...');
     const sightengineResult = await analyzeWithSightengine(imageData);
     
     if (sightengineResult.method === 'sightengine_api') {
-      console.log('✅ [SIGHTENGINE] Detection succeeded with user creds');
+      log('✅ [SIGHTENGINE] Detection succeeded with user creds');
       return sightengineResult;
     }
   }
@@ -218,10 +233,14 @@ async function processAnalysis(request) {
   }
   
   // STEP 4: Last resort - heuristic
-  console.log('⚠️ Using heuristic fallback');
+  log('⚠️ Using heuristic fallback');
   const heuristicResult = await analyzeImageHeuristic(imageData);
   heuristicResult.fallback = true;
-  heuristicResult.indicators.unshift('⚠️ Detection service temporarily unavailable');
+  const platformName = getPlatformDisplayName(imageData.pageHost || '');
+  const unavailableMsg = platformName
+    ? `⚠️ Detection service temporarily unavailable on ${platformName}`
+    : '⚠️ Detection service temporarily unavailable';
+  heuristicResult.indicators.unshift(unavailableMsg);
   return heuristicResult;
 }
 
@@ -236,7 +255,7 @@ async function analyzeWithProxy(imageData, license) {
   if (!userId) {
     userId = 'fs_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
     await chrome.storage.local.set({ userId });
-    console.log('🆔 Created user ID:', userId);
+    log('🆔 Created user ID:', userId);
   }
   
   const isPro = license?.isPro === true;
@@ -261,13 +280,14 @@ async function analyzeWithProxy(imageData, license) {
     
     // Daily limit reached - special handling
     if (response.status === 429 || data.error === 'DAILY_LIMIT_REACHED') {
+      const limit = data.limit || 5;
       return {
         isAI: false,
         aiProbability: 0,
         confidence: 0,
         indicators: [
           '🔒 Daily limit reached',
-          `Used ${data.used || 20} of ${data.limit || 20} free investigations today`,
+          `Used ${data.used || limit} of ${limit} free investigations today`,
           '👉 Upgrade to Pro for unlimited'
         ],
         method: 'error',
@@ -275,11 +295,11 @@ async function analyzeWithProxy(imageData, license) {
         upgradeUrl: data.upgradeUrl || 'https://fauxspy.com/pro',
         dailyLimitInfo: {
           used: data.used,
-          limit: data.limit
+          limit
         }
       };
     }
-    
+
     // Other error responses
     if (!response.ok || !data.success) {
       console.warn('⚠️ Proxy returned error:', data);
@@ -308,11 +328,16 @@ async function analyzeWithProxy(imageData, license) {
     
   } catch (error) {
     console.error('❌ Proxy call failed:', error);
+    const platform = getPlatformDisplayName(imageData.pageHost || '');
     return {
       method: 'error',
       error: 'NETWORK_ERROR',
       errorDetail: error.message,
-      indicators: ['Backend unavailable - check connection']
+      indicators: [
+        platform
+          ? `Could not reach Faux Spy on ${platform} — check your connection`
+          : 'Backend unavailable — check your connection'
+      ]
     };
   }
 }
@@ -343,13 +368,13 @@ async function analyzeWithSightengine({ src, width, height, pageUrl, pageHost, p
   // Check cache first
   const cached = await checkCache('se_' + src);
   if (cached) {
-    console.log('📦 [CACHE] Using cached Sightengine result for:', src.substring(0, 60));
+    log('📦 [CACHE] Using cached Sightengine result for:', src.substring(0, 60));
     await incrementStat('cached');
     return cached;
   }
   
   try {
-    console.log(`🔍 [SIGHTENGINE] Analyzing: ${src.substring(0, 80)}...`);
+    log(`🔍 [SIGHTENGINE] Analyzing: ${src.substring(0, 80)}...`);
     
     // Build URL with query params (Sightengine uses GET with query string)
     const params = new URLSearchParams({
@@ -369,7 +394,7 @@ async function analyzeWithSightengine({ src, width, height, pageUrl, pageHost, p
     });
     
     const data = await response.json();
-    console.log('📦 [SIGHTENGINE] Response:', JSON.stringify(data, null, 2));
+    log('📦 [SIGHTENGINE] Response:', JSON.stringify(data, null, 2));
     
     // Check for API errors
     if (data.status === 'failure') {
@@ -406,7 +431,7 @@ async function analyzeWithSightengine({ src, width, height, pageUrl, pageHost, p
     
     const isAI = aiProbability > 0.5;
     
-    console.log(`
+    log(`
 ════════════════════════════════════════════════════════
 🔍 SIGHTENGINE DETECTION RESULT
 ════════════════════════════════════════════════════════
@@ -515,7 +540,7 @@ async function analyzeImageData({ src, width, height, pageUrl, pageHost, pageTit
   // Check cache first
   const cached = await checkCache(src);
   if (cached) {
-    console.log('📦 [CACHE] Using cached result for:', src.substring(0, 60));
+    log('📦 [CACHE] Using cached result for:', src.substring(0, 60));
     await incrementStat('cached');
     return cached;
   }
@@ -589,7 +614,7 @@ async function analyzeImageData({ src, width, height, pageUrl, pageHost, pageTit
   
   for (const strategy of authStrategies) {
     try {
-      console.log(`🔑 [HIVE] Trying auth strategy: ${strategy.name}`);
+      log(`🔑 [HIVE] Trying auth strategy: ${strategy.name}`);
       
       const response = await fetch('https://api.thehive.ai/api/v2/task/sync', {
         method: 'POST',
@@ -601,7 +626,7 @@ async function analyzeImageData({ src, width, height, pageUrl, pageHost, pageTit
       });
 
       if (response.ok) {
-        console.log(`✅ [HIVE] Auth strategy worked: ${strategy.name}`);
+        log(`✅ [HIVE] Auth strategy worked: ${strategy.name}`);
         
         // Save which strategy worked so we use it first next time
         await chrome.storage.local.set({ workingHiveAuth: strategy.name });
@@ -650,7 +675,7 @@ async function analyzeImageData({ src, width, height, pageUrl, pageHost, pageTit
  * Process a successful Hive response and extract AI detection result
  */
 async function processHiveResponse(data, src) {
-  console.log('📦 [HIVE] Full API response:', JSON.stringify(data, null, 2));
+  log('📦 [HIVE] Full API response:', JSON.stringify(data, null, 2));
   
   // Check for errors in response
   if (data.status && data.status[0] && data.status[0].response && data.status[0].response.status === 'error') {
@@ -671,7 +696,7 @@ async function processHiveResponse(data, src) {
   const aiProbability = aiClass.score;
   const isAI = aiProbability > 0.5;
   
-  console.log(`
+  log(`
 ════════════════════════════════════════════════════════
 🔍 HIVE API DETECTION RESULT (v1.2)
 ════════════════════════════════════════════════════════
@@ -714,7 +739,7 @@ async function processHiveResponse(data, src) {
     timestamp: Date.now()
   };
   
-  console.log(`✅ [HIVE] Final result:`, result);
+  log(`✅ [HIVE] Final result:`, result);
   
   // Cache the result
   await cacheResult(src, result);
@@ -742,7 +767,7 @@ async function checkCache(imageUrl) {
     const age = Date.now() - (cached.timestamp || 0);
     
     if (age > CACHE_DURATION) {
-      console.log('🗑️ [CACHE] Expired, will re-analyze');
+      log('🗑️ [CACHE] Expired, will re-analyze');
       return null;
     }
     
@@ -777,7 +802,7 @@ async function cacheResult(imageUrl, result) {
     }
     
     await chrome.storage.local.set({ imageCache: cache });
-    console.log('💾 [CACHE] Result saved');
+    log('💾 [CACHE] Result saved');
   } catch (error) {
     console.error('Cache save error:', error);
   }
@@ -1023,9 +1048,9 @@ async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pa
       indicators.push('Heuristic-only analysis - configure Hive AI for verification');
     }
     
-    console.log(`🔍 [HEURISTIC] Final score: ${(confidence * 100).toFixed(1)}%`);
-    console.log(`🔍 [HEURISTIC] Verdict: ${isAI ? 'AI' : (confidence >= 0.40 ? 'Inconclusive' : 'Real')}`);
-    console.log(`🔍 [HEURISTIC] Indicators:`, indicators);
+    log(`🔍 [HEURISTIC] Final score: ${(confidence * 100).toFixed(1)}%`);
+    log(`🔍 [HEURISTIC] Verdict: ${isAI ? 'AI' : (confidence >= 0.40 ? 'Inconclusive' : 'Real')}`);
+    log(`🔍 [HEURISTIC] Indicators:`, indicators);
     
     return {
       isAI: isAI,

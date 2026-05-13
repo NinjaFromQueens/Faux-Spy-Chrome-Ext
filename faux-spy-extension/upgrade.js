@@ -1,4 +1,7 @@
 // ============================================================================
+
+const DEBUG = false;
+const log = (...a) => { if (DEBUG) console.log(...a); };
 // Upgrade Page - Stripe Integration with Monthly & Yearly Plans
 // ============================================================================
 
@@ -6,8 +9,8 @@
 
 // Stripe Price IDs
 const STRIPE_PRICES = {
-  monthly: 'price_1T0SzwEPHQ3lnrIPuD8EOiIv', // $9.99/month
-  yearly: 'price_YEARLY_PLACEHOLDER'          // $99/year - TO BE CREATED
+  monthly: 'price_1TWOAXE3FV5aR9qEvdBOx8hI', // $9.99/month
+  yearly:  'price_1TWOAXE3FV5aR9qE9NUCu9Ur'  // $99/year
 };
 
 // State
@@ -49,7 +52,7 @@ function switchPlan(plan) {
     proYearly.style.display = 'none';
   }
   
-  console.log(`💳 Plan switched to: ${plan}`);
+  log(`💳 Plan switched to: ${plan}`);
 }
 
 // Toggle click handlers
@@ -65,12 +68,8 @@ yearlyOption.addEventListener('click', () => switchPlan('yearly'));
 // ============================================================================
 
 async function startCheckout(plan) {
-  console.log(`🚀 Starting ${plan} checkout...`);
+  log(`🚀 Starting ${plan} checkout...`);
   
-  if (plan === 'yearly' && STRIPE_PRICES.yearly.includes('PLACEHOLDER')) {
-    alert(`Yearly plan coming soon! Please choose the monthly plan for now.`);
-    return;
-  }
 
   try {
     const { userEmail } = await chrome.storage.local.get(['userEmail']);
@@ -95,7 +94,7 @@ async function startCheckout(plan) {
     const { url } = await response.json();
 
     // Redirect to Stripe Checkout
-    console.log('✅ Redirecting to Stripe Checkout...');
+    log('✅ Redirecting to Stripe Checkout...');
     window.location.href = url;
     
   } catch (error) {
@@ -119,7 +118,7 @@ async function checkPaymentStatus() {
   const cancelled = urlParams.get('cancelled');
 
   if (cancelled === 'true') {
-    console.log('❌ Payment cancelled');
+    log('❌ Payment cancelled');
     alert('Payment was cancelled. No charges were made.');
   }
 }
@@ -129,7 +128,7 @@ async function checkPaymentStatus() {
 // ============================================================================
 
 async function init() {
-  console.log('🚀 Upgrade page loaded');
+  log('🚀 Upgrade page loaded');
   
   // Check for payment callback
   await checkPaymentStatus();
@@ -138,13 +137,13 @@ async function init() {
   const { license } = await chrome.storage.local.get('license');
   
   if (license?.isPro) {
-    console.log('✅ User already has Pro');
+    log('✅ User already has Pro');
     // Could show "Manage Subscription" instead
   }
   
-  console.log('💳 Stripe integration ready');
-  console.log(`   Monthly: ${STRIPE_PRICES.monthly}`);
-  console.log(`   Yearly: ${STRIPE_PRICES.yearly}`);
+  log('💳 Stripe integration ready');
+  log(`   Monthly: ${STRIPE_PRICES.monthly}`);
+  log(`   Yearly: ${STRIPE_PRICES.yearly}`);
 }
 
 // Start when DOM is ready

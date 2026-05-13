@@ -177,6 +177,25 @@
   cursor: default;
 }
 
+.ai-badge-report {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 2px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  transition: background var(--ai-duration-fast) var(--ai-ease);
+}
+
+.ai-badge-report:hover {
+  background: rgba(255, 255, 255, 0.35);
+  color: white;
+}
+
 .ai-badge-upgrade {
   background: linear-gradient(135deg, #fbbf24, #f59e0b);
 }
