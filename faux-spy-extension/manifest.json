@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "description": "Spy on the fakes! Detect AI vs Real photos, plus AI Art and Digital Art (Pro). Works on Instagram, Pinterest, X.",
   "permissions": [
     "activeTab",
@@ -9,21 +9,7 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*.instagram.com/*",
-    "*://*.cdninstagram.com/*",
-    "*://*.pinterest.com/*",
-    "*://*.pinimg.com/*",
-    "*://*.twitter.com/*",
-    "*://*.x.com/*",
-    "*://*.facebook.com/*",
-    "*://*.fbcdn.net/*",
-    "*://*.reddit.com/*",
-    "*://*.redditmedia.com/*",
-    "*://*.tiktok.com/*",
-    "*://*.tiktokcdn.com/*",
-    "*://*.threads.net/*",
-    "*://*.linkedin.com/*",
-    "*://*.licdn.com/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -40,23 +26,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "*://*.instagram.com/*",
-        "*://*.cdninstagram.com/*",
-        "*://*.pinterest.com/*",
-        "*://*.pinimg.com/*",
-        "*://*.twitter.com/*",
-        "*://*.x.com/*",
-        "*://*.facebook.com/*",
-        "*://*.fbcdn.net/*",
-        "*://*.reddit.com/*",
-        "*://*.redditmedia.com/*",
-        "*://*.tiktok.com/*",
-        "*://*.tiktokcdn.com/*",
-        "*://*.threads.net/*",
-        "*://*.linkedin.com/*",
-        "*://*.licdn.com/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
       "css": ["content.css"]
     }
