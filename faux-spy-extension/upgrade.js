@@ -16,14 +16,8 @@ const STRIPE_PRICES = {
 // State
 let currentPlan = 'monthly'; // 'monthly' or 'yearly'
 
-// DOM Elements
-const toggleSwitch = document.getElementById('toggleSwitch');
-const monthlyOption = document.getElementById('monthlyOption');
-const yearlyOption = document.getElementById('yearlyOption');
-const proMonthly = document.getElementById('proMonthly');
-const proYearly = document.getElementById('proYearly');
-const monthlyButton = document.getElementById('monthlyButton');
-const yearlyButton = document.getElementById('yearlyButton');
+// DOM Elements (set in DOMContentLoaded)
+let toggleSwitch, monthlyOption, yearlyOption, proMonthly, proYearly, monthlyButton, yearlyButton;
 
 // ============================================================================
 // PLAN TOGGLE
@@ -31,37 +25,23 @@ const yearlyButton = document.getElementById('yearlyButton');
 
 function switchPlan(plan) {
   currentPlan = plan;
-  
+
   if (plan === 'yearly') {
-    // Update toggle
-    toggleSwitch.classList.add('yearly');
-    monthlyOption.classList.remove('active');
-    yearlyOption.classList.add('active');
-    
-    // Show yearly card, hide monthly
-    proMonthly.style.display = 'none';
-    proYearly.style.display = 'block';
+    toggleSwitch?.classList.add('yearly');
+    monthlyOption?.classList.remove('active');
+    yearlyOption?.classList.add('active');
+    if (proMonthly) proMonthly.style.display = 'none';
+    if (proYearly) proYearly.style.display = 'block';
   } else {
-    // Update toggle
-    toggleSwitch.classList.remove('yearly');
-    monthlyOption.classList.add('active');
-    yearlyOption.classList.remove('active');
-    
-    // Show monthly card, hide yearly
-    proMonthly.style.display = 'block';
-    proYearly.style.display = 'none';
+    toggleSwitch?.classList.remove('yearly');
+    monthlyOption?.classList.add('active');
+    yearlyOption?.classList.remove('active');
+    if (proMonthly) proMonthly.style.display = 'block';
+    if (proYearly) proYearly.style.display = 'none';
   }
-  
+
   log(`💳 Plan switched to: ${plan}`);
 }
-
-// Toggle click handlers
-toggleSwitch.addEventListener('click', () => {
-  switchPlan(currentPlan === 'monthly' ? 'yearly' : 'monthly');
-});
-
-monthlyOption.addEventListener('click', () => switchPlan('monthly'));
-yearlyOption.addEventListener('click', () => switchPlan('yearly'));
 
 // ============================================================================
 // STRIPE CHECKOUT
@@ -93,6 +73,11 @@ async function startCheckout(plan) {
     
     const { url } = await response.json();
 
+    // Validate URL before redirecting (prevent open redirect)
+    if (!url || !url.startsWith('https://')) {
+      throw new Error('Invalid checkout URL received from server');
+    }
+
     // Redirect to Stripe Checkout
     log('✅ Redirecting to Stripe Checkout...');
     window.location.href = url;
@@ -103,9 +88,6 @@ async function startCheckout(plan) {
   }
 }
 
-// Button click handlers
-monthlyButton.addEventListener('click', () => startCheckout('monthly'));
-yearlyButton.addEventListener('click', () => startCheckout('yearly'));
 
 // ============================================================================
 // CHECK FOR SUCCESSFUL PAYMENT
@@ -129,18 +111,35 @@ async function checkPaymentStatus() {
 
 async function init() {
   log('🚀 Upgrade page loaded');
-  
+
+  // Cache DOM elements
+  toggleSwitch = document.getElementById('toggleSwitch');
+  monthlyOption = document.getElementById('monthlyOption');
+  yearlyOption = document.getElementById('yearlyOption');
+  proMonthly = document.getElementById('proMonthly');
+  proYearly = document.getElementById('proYearly');
+  monthlyButton = document.getElementById('monthlyButton');
+  yearlyButton = document.getElementById('yearlyButton');
+
+  // Attach toggle listeners
+  toggleSwitch?.addEventListener('click', () => switchPlan(currentPlan === 'monthly' ? 'yearly' : 'monthly'));
+  monthlyOption?.addEventListener('click', () => switchPlan('monthly'));
+  yearlyOption?.addEventListener('click', () => switchPlan('yearly'));
+
+  // Attach checkout listeners
+  monthlyButton?.addEventListener('click', () => startCheckout('monthly'));
+  yearlyButton?.addEventListener('click', () => startCheckout('yearly'));
+
   // Check for payment callback
   await checkPaymentStatus();
-  
+
   // Load user's current license
   const { license } = await chrome.storage.local.get('license');
-  
+
   if (license?.isPro) {
     log('✅ User already has Pro');
-    // Could show "Manage Subscription" instead
   }
-  
+
   log('💳 Stripe integration ready');
   log(`   Monthly: ${STRIPE_PRICES.monthly}`);
   log(`   Yearly: ${STRIPE_PRICES.yearly}`);

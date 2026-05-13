@@ -96,7 +96,7 @@ const UI = {
       DOM.scansUsed.textContent = usage.used;
       const limitEl = document.getElementById('scansLimit');
       if (limitEl) limitEl.textContent = usage.limit;
-      const percentage = (usage.used / usage.limit) * 100;
+      const percentage = Math.min(100, Math.round((usage.used / usage.limit) * 100));
       DOM.progressFill.style.width = `${percentage}%`;
       
       // Change color based on usage (v1.4.1: scales to actual limit)

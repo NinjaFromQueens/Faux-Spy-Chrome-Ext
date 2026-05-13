@@ -283,15 +283,19 @@ async function testSightengine() {
     
   } catch (error) {
     console.error('Test error:', error);
-    sightengineTestResultsDiv.innerHTML = `
-      <div style="background: rgba(239, 68, 68, 0.1); border-radius: 8px; padding: 12px; color: #f87171;">
-        <strong>❌ Network Error</strong><br>
-        <small style="color: #cbd5e1; display: block; margin-top: 4px;">${error.message}</small>
-        <small style="color: #94a3b8; display: block; margin-top: 8px;">
-          This usually means: firewall, network issue, or browser extension permissions problem.
-        </small>
-      </div>
-    `;
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'background: rgba(239, 68, 68, 0.1); border-radius: 8px; padding: 12px; color: #f87171;';
+    const errMsg = document.createElement('small');
+    errMsg.style.cssText = 'color: #cbd5e1; display: block; margin-top: 4px;';
+    errMsg.textContent = error.message;
+    errDiv.innerHTML = '<strong>❌ Network Error</strong><br>';
+    errDiv.appendChild(errMsg);
+    const errHint = document.createElement('small');
+    errHint.style.cssText = 'color: #94a3b8; display: block; margin-top: 8px;';
+    errHint.textContent = 'This usually means: firewall, network issue, or browser extension permissions problem.';
+    errDiv.appendChild(errHint);
+    sightengineTestResultsDiv.innerHTML = '';
+    sightengineTestResultsDiv.appendChild(errDiv);
   } finally {
     testSightengineBtn.disabled = false;
     testSightengineBtn.textContent = '🧪 Test Connection';

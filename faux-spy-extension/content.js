@@ -1010,6 +1010,7 @@ function getOrCreateOverlay(img) {
   
   // Watch for image position changes (Instagram dynamically repositions)
   if (window.ResizeObserver) {
+    if (overlay._resizeObserver) overlay._resizeObserver.disconnect();
     const resizeObs = new ResizeObserver(updatePos);
     resizeObs.observe(img);
     overlay._resizeObserver = resizeObs;
@@ -1486,7 +1487,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     clearAllHighlights();
     sendResponse({ success: true });
   }
-  
+
+  if (request.action === 'showContextResult') {
+    removeLoadingBadge(null);
+    if (request.result && !request.result.error) {
+      showAnimatedResultPanel(null, request.result);
+    } else {
+      console.warn('Context scan failed:', request.result?.error);
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   // Handle sensitivity change from settings
   if (request.action === 'sensitivityChanged') {
     state.sensitivity = request.sensitivity;
@@ -1520,6 +1532,11 @@ if (document.readyState === 'loading') {
 // v8.1: ANIMATED RESULT PANEL
 // ============================================================================
 
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 function showAnimatedResultPanel(img, result) {
   // Remove any existing panel
   const existing = document.querySelector('.ai-result-panel-v8');
@@ -1545,8 +1562,8 @@ function showAnimatedResultPanel(img, result) {
     <div class="ai-panel-body">
       ${imageUrl ? `
         <div class="ai-panel-preview">
-          <img src="${imageUrl}" alt="Scanned image" />
-          <div class="ai-panel-preview-name">${imageName}</div>
+          <img src="${imageUrl.replace(/"/g, '%22')}" alt="Scanned image" />
+          <div class="ai-panel-preview-name">${escapeHtml(imageName)}</div>
         </div>
       ` : ''}
       
@@ -1596,7 +1613,7 @@ function showAnimatedResultPanel(img, result) {
       ${result.indicators && result.indicators.length > 0 ? `
         <div class="ai-panel-indicators">
           <div class="ai-indicators-title">Investigation Notes:</div>
-          ${result.indicators.map(ind => `<div class="ai-indicator-item">${ind}</div>`).join('')}
+          ${result.indicators.map(ind => `<div class="ai-indicator-item">${escapeHtml(String(ind))}</div>`).join('')}
         </div>
       ` : ''}
       
@@ -1741,7 +1758,7 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
     </div>
     
     <div class="ai-share-preview">
-      <pre>${shareText}</pre>
+      <pre id="ai-share-text-content"></pre>
     </div>
     
     <div class="ai-share-options">
@@ -1793,7 +1810,8 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
   `;
   
   document.body.appendChild(menu);
-  
+  menu.querySelector('#ai-share-text-content').textContent = shareText;
+
   // Close handlers
   const closeMenu = () => menu.remove();
   menu.querySelector('.ai-share-close').onclick = closeMenu;

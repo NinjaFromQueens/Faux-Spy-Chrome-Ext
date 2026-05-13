@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "Spy on the fakes! Detect AI vs Real photos, plus AI Art and Digital Art (Pro). Works on Instagram, Pinterest, X.",
   "permissions": [
     "activeTab",

@@ -101,11 +101,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const result = await processAnalysis({ src: info.srcUrl });
     
     // Show notification in the page
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'showContextResult',
-      result: result,
-      src: info.srcUrl
-    });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'showContextResult',
+        result: result,
+        src: info.srcUrl
+      }).catch(() => {});
+    }
   }
 });
 
@@ -275,8 +277,17 @@ async function analyzeWithProxy(imageData, license) {
         pageHost: imageData.pageHost || ''
       })
     });
-    
-    const data = await response.json();
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return {
+        method: 'error',
+        error: 'PARSE_ERROR',
+        indicators: ['Invalid response from detection service']
+      };
+    }
     
     // Daily limit reached - special handling
     if (response.status === 429 || data.error === 'DAILY_LIMIT_REACHED') {
