@@ -442,6 +442,7 @@ const WidgetPool = {
   widget: null,
   isVisible: false,
   currentImage: null,
+  _pendingImage: null,  // immune to hide() — persists until scan starts
   cleanupFns: [],
 
   init() {
@@ -458,34 +459,36 @@ const WidgetPool = {
       </button>
     `;
     
-    // Attach click handler with multiple methods for reliability
     const button = this.widget.querySelector('.ai-widget-btn');
-    
+
+    // Dedup flag prevents both pointerdown+click from firing the scan twice
+    let _scanFired = false;
     const handleClick = (e) => {
+      if (_scanFired) return;
+      _scanFired = true;
+      setTimeout(() => { _scanFired = false; }, 600);
+
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      log('🖱️ Widget button clicked via:', e.type);
+      log('🖱️ Investigate clicked via:', e.type);
 
-      // Save ref BEFORE hide() nullifies currentImage
-      const imgToScan = WidgetPool.currentImage;
+      // _pendingImage is set in show() and NOT cleared by hide() — race-condition safe
+      const imgToScan = WidgetPool._pendingImage || WidgetPool.currentImage;
+      WidgetPool._pendingImage = null;
       if (imgToScan) {
-        log('🎯 Scanning image:', imgToScan.src?.substring(0, 50));
+        log('🎯 Scanning:', imgToScan.src?.substring(0, 60));
         WidgetPool.hide();
         scanImage(imgToScan);
       } else {
-        console.warn('⚠️ No current image to scan');
+        console.warn('⚠️ No image to scan — widget shown without setting _pendingImage');
       }
-      return false;
     };
-    
-    // AGGRESSIVE: 6 different event handlers
-    button.onclick = handleClick;  // Method 1: Direct
-    button.addEventListener('click', handleClick, false);  // Method 2: Bubble
-    button.addEventListener('click', handleClick, true);   // Method 3: Capture
-    button.addEventListener('mousedown', handleClick, true);  // Method 4: Mousedown
-    button.addEventListener('mouseup', handleClick, true);    // Method 5: Mouseup
-    button.addEventListener('pointerdown', handleClick, true); // Method 6: Pointer
+
+    // Two handlers: pointerdown fires before click (covers sites that block click)
+    // dedup flag ensures only one scan runs per user gesture
+    button.addEventListener('pointerdown', handleClick, true);
+    button.addEventListener('click', handleClick, true);
     
     // Cancel the hide timer when mouse enters the button widget itself
     this.widget.addEventListener('mouseenter', () => {
@@ -498,8 +501,9 @@ const WidgetPool = {
 
   show(img) {
     if (!this.widget) this.init();
+    this._pendingImage = img;  // always update, even on early return
     if (this.currentImage === img && this.isVisible) return;
-    
+
     this.currentImage = img;
     this.isVisible = true;
     this.position(img);
@@ -753,10 +757,12 @@ async function scanImage(img) {
         upgradeUrl: result.upgradeUrl || 'https://fauxspy.com/pro'
       });
     } else {
+      state.scannedImages.delete(bestUrl); // allow retry on error
       console.error('❌ Scan failed:', result);
       showError(img, result?.error || 'Analysis failed');
     }
   } catch (error) {
+    state.scannedImages.delete(bestUrl); // allow retry on exception
     console.error('❌ Scan error:', error);
     removeLoadingBadge(img);
     showError(img, error.message);
@@ -1159,7 +1165,7 @@ document.addEventListener('mouseleave', (e) => {
       if (!WidgetPool.widget?.matches(':hover')) {
         WidgetPool.hide();
       }
-    }, 200); // 200ms gives button clicks time to register
+    }, 400); // 400ms — room for slow cursors to reach the button
   }
 }, true);
 
