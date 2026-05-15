@@ -163,44 +163,6 @@ body {
   margin-bottom: 12px;
 }
 
-.token-balance-row {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  font-size: 12px;
-}
-
-.token-label {
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.token-count {
-  font-weight: 700;
-  color: var(--text-primary);
-  flex: 1;
-}
-
-.btn-buy-tokens {
-  padding: 4px 10px;
-  background: transparent;
-  color: var(--gold, #fbbf24);
-  border: 1px solid var(--gold, #fbbf24);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.btn-buy-tokens:hover {
-  background: var(--gold, #fbbf24);
-  color: var(--noir-medium, #1a1f2e);
-}
-
 .btn-manage {
   width: 100%;
   padding: 10px 16px;

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Screenshot 2 - AI Detection In Action (1280x800)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1419;
+  color: #f8fafc;
+}
+
+.layout {
+  display: flex;
+  height: 100%;
+}
+
+/* Left panel: dark background with explanation */
+.left {
+  width: 480px;
+  background: #0a0e1a;
+  border-right: 1px solid rgba(251,191,36,0.12);
+  padding: 60px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.left::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(ellipse 400px 300px at 0% 30%, rgba(251,191,36,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 300px 400px at 100% 80%, rgba(139,92,246,0.08) 0%, transparent 60%);
+}
+.left::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(251,191,36,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(251,191,36,0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.left-content { position: relative; z-index: 1; }
+
+.step-num {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; color: #0a0e1a;
+  margin-bottom: 20px;
+  box-shadow: 0 0 16px rgba(251,191,36,0.35);
+}
+
+.headline {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+.headline .gold {
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.description {
+  font-size: 15px;
+  color: #94a3b8;
+  line-height: 1.65;
+  margin-bottom: 32px;
+}
+
+.how-it-works { display: flex; flex-direction: column; gap: 14px; }
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: rgba(251,191,36,0.04);
+  border: 1px solid rgba(251,191,36,0.1);
+  border-radius: 10px;
+}
+.step-icon { font-size: 22px; flex-shrink: 0; }
+.step-text { font-size: 13px; color: #cbd5e1; line-height: 1.4; }
+.step-text strong { color: #f8fafc; font-weight: 700; }
+
+/* Right: grid of images with detection badges */
+.right {
+  flex: 1;
+  background: #111827;
+  padding: 30px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 16px;
+  align-content: center;
+}
+
+.img-card {
+  border-radius: 12px;
+  overflow: visible;
+  position: relative;
+  background: #1a1f2e;
+  border: 1px solid rgba(255,255,255,0.06);
+  aspect-ratio: 4/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.img-card.highlighted {
+  border-color: rgba(239,68,68,0.4);
+  box-shadow: 0 0 0 2px rgba(239,68,68,0.2), 0 8px 24px rgba(0,0,0,0.4);
+}
+.img-card.real-highlighted {
+  border-color: rgba(16,185,129,0.4);
+  box-shadow: 0 0 0 2px rgba(16,185,129,0.2), 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.hover-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.hover-badge.ai { background: linear-gradient(135deg, rgba(239,68,68,0.95), rgba(220,38,38,0.95)); color: white; }
+.hover-badge.real { background: linear-gradient(135deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95)); color: white; }
+.hover-badge.scanning {
+  background: rgba(251,191,36,0.9);
+  color: #0a0e1a;
+  animation: scanning 1.5s ease-in-out infinite;
+}
+@keyframes scanning {
+  0%,100% { opacity: 0.8; }
+  50% { opacity: 1; box-shadow: 0 0 16px rgba(251,191,36,0.6); }
+}
+
+/* card backgrounds */
+.card-ai1 { background: linear-gradient(135deg, #1a1020, #2d1535); }
+.card-ai2 { background: linear-gradient(135deg, #0f1520, #1a2535); }
+.card-ai3 { background: linear-gradient(135deg, #1a1a10, #2d2d15); }
+.card-real1 { background: linear-gradient(135deg, #0f1a10, #152d15); }
+.card-real2 { background: linear-gradient(135deg, #1a0f0f, #2d1515); }
+.card-scan { background: linear-gradient(135deg, #101a1a, #152d2d); }
+
+.img-label {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10px;
+  color: #475569;
+  background: rgba(0,0,0,0.5);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Detection tooltip for the hovered card */
+.tooltip {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0a0e1a;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 10px;
+  padding: 12px 14px;
+  width: 240px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  z-index: 10;
+}
+.tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 14px; height: 14px;
+  background: #0a0e1a;
+  border-right: 1px solid rgba(239,68,68,0.3);
+  border-bottom: 1px solid rgba(239,68,68,0.3);
+}
+.tt-title { font-size: 12px; font-weight: 700; color: #f87171; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.tt-bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.tt-fill { height: 100%; background: linear-gradient(90deg, #ef4444, #dc2626); border-radius: 3px; }
+.tt-label { display: flex; justify-content: space-between; font-size: 10px; color: #64748b; }
+.tt-pct { color: #f87171; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="left">
+    <div class="left-content">
+      <div class="step-num">🕵️</div>
+      <div class="headline">
+        AI Images Exposed<br>
+        <span class="gold">Instantly</span>
+      </div>
+      <div class="description">
+        Faux Spy analyzes every image you hover over, using AI pattern recognition to detect digital artifacts, diffusion signatures, and GAN-generated textures that the human eye misses.
+      </div>
+      <div class="how-it-works">
+        <div class="step-row">
+          <span class="step-icon">👆</span>
+          <div class="step-text"><strong>Hover any image</strong> — Faux Spy scans it instantly and shows a confidence badge</div>
+        </div>
+        <div class="step-row">
+          <span class="step-icon">🔬</span>
+          <div class="step-text"><strong>Deep pattern analysis</strong> — Detects Midjourney, DALL-E, Stable Diffusion &amp; GAN artifacts</div>
+        </div>
+        <div class="step-row">
+          <span class="step-icon">🎯</span>
+          <div class="step-text"><strong>Color-coded results</strong> — Red for AI, Green for Real, with confidence percentage</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <!-- Card 1: AI, highlighted with tooltip -->
+    <div class="img-card card-ai1 highlighted" style="grid-column:1; grid-row:1;">
+      🌸
+      <div class="hover-badge ai">🤖 AI Generated · 96%</div>
+      <div class="img-label">@ai_flora</div>
+      <div class="tooltip">
+        <div class="tt-title">🤖 AI Generated Image</div>
+        <div class="tt-bar"><div class="tt-fill" style="width:96%"></div></div>
+        <div class="tt-label"><span>Midjourney v6 artifacts</span><span class="tt-pct">96%</span></div>
+      </div>
+    </div>
+
+    <!-- Card 2: AI -->
+    <div class="img-card card-ai2" style="grid-column:2; grid-row:1;">
+      🏔️
+      <div class="hover-badge ai">🤖 AI · 91%</div>
+      <div class="img-label">@landscape_art</div>
+    </div>
+
+    <!-- Card 3: REAL -->
+    <div class="img-card card-real1 real-highlighted" style="grid-column:3; grid-row:1;">
+      🤳
+      <div class="hover-badge real">✅ Real · 98%</div>
+      <div class="img-label">@real_traveler</div>
+    </div>
+
+    <!-- Card 4: AI -->
+    <div class="img-card card-ai3" style="grid-column:1; grid-row:2;">
+      🐈
+      <div class="hover-badge ai">🤖 AI · 88%</div>
+      <div class="img-label">@catlovers</div>
+    </div>
+
+    <!-- Card 5: Scanning -->
+    <div class="img-card card-scan" style="grid-column:2; grid-row:2;">
+      🏙️
+      <div class="hover-badge scanning">⚡ Scanning...</div>
+      <div class="img-label">@cityscape</div>
+    </div>
+
+    <!-- Card 6: REAL -->
+    <div class="img-card card-real2" style="grid-column:3; grid-row:2;">
+      🌊
+      <div class="hover-badge real">✅ Real · 94%</div>
+      <div class="img-label">@ocean_views</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

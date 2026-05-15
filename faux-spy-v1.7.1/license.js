@@ -64,9 +64,6 @@ async function activateLicense(licenseKey) {
       email: data.email,
       expiresAt: data.expiresAt,
       activatedAt: Date.now(),
-      tokenBalance: data.tokenBalance ?? 0,
-      topupBalance: data.topupBalance ?? 0,
-      tokensIncluded: data.tokensIncluded ?? 200,
       features: data.features || {
         unlimitedScans: true,
         deepDive: true,
@@ -150,14 +147,11 @@ async function revalidateLicense() {
       return freeLicense;
     }
     
-    // Update license with fresh info from server (including token balances)
+    // Update license with fresh info from server
     const updatedLicense = {
       ...license,
       expiresAt: data.expiresAt,
       plan: data.plan,
-      tokenBalance: data.tokenBalance ?? license.tokenBalance ?? 0,
-      topupBalance: data.topupBalance ?? license.topupBalance ?? 0,
-      tokensIncluded: data.tokensIncluded ?? license.tokensIncluded ?? 200,
       features: data.features || license.features
     };
     
@@ -197,9 +191,10 @@ async function getLicense() {
     return freeLicense;
   }
   
-  // Migration: normalize free tier to current 10 scans/day
-  if (license && !license.isPro && license.limits && license.limits.scansPerDay !== 10) {
-    license.limits.scansPerDay = 10;
+  // v1.4.1 MIGRATION: Auto-upgrade old cached licenses with 5-scan limit
+  if (license && !license.isPro && license.limits && license.limits.scansPerDay < 20) {
+    log('🔧 [MIGRATION] Upgrading from', license.limits.scansPerDay, 'to 20 scans/day');
+    license.limits.scansPerDay = 20;
     await chrome.storage.local.set({ license });
   }
   
@@ -215,38 +210,16 @@ async function getLicense() {
 }
 
 /**
- * Check if user can perform a scan (respects daily limits and token balance)
+ * Check if user can perform a scan (respects daily limits)
  */
 async function canScan() {
   const license = await getLicense();
-
-  // Pro users: token-based limit
+  
+  // Pro users have unlimited scans
   if (license?.isPro) {
-    // If token system is active (tokenBalance is defined), check balance
-    if (license.tokenBalance !== undefined) {
-      const totalTokens = (license.tokenBalance || 0) + (license.topupBalance || 0);
-      if (totalTokens <= 0) {
-        return {
-          allowed: false,
-          remaining: 0,
-          isPro: true,
-          tokenBalance: 0,
-          topupBalance: 0,
-          tokensExhausted: true,
-        };
-      }
-      return {
-        allowed: true,
-        remaining: totalTokens,
-        isPro: true,
-        tokenBalance: license.tokenBalance,
-        topupBalance: license.topupBalance,
-      };
-    }
-    // Legacy license without token data — allow scan (server enforces)
     return {
       allowed: true,
-      remaining: -1,
+      remaining: -1, // Unlimited
       isPro: true,
     };
   }
@@ -266,7 +239,7 @@ async function canScan() {
     scans = 0;
   }
   
-  const limit = license.limits?.scansPerDay || 10;
+  const limit = license.limits?.scansPerDay || 20;
   const remaining = Math.max(0, limit - scans);
   
   return {
@@ -298,33 +271,6 @@ async function incrementDailyScans() {
 }
 
 /**
- * Decrement local token cache after a successful scan.
- * The server is authoritative; this just keeps the UI responsive between revalidations.
- */
-async function decrementTokenBalance() {
-  const { license } = await chrome.storage.local.get('license');
-  if (!license?.isPro || license.tokenBalance === undefined) return;
-
-  if (license.tokenBalance > 0) {
-    license.tokenBalance -= 1;
-  } else if (license.topupBalance > 0) {
-    license.topupBalance -= 1;
-  }
-  await chrome.storage.local.set({ license });
-}
-
-/**
- * Sync token balance returned by detect API into local cache.
- */
-async function syncTokenBalance(tokenBalance, topupBalance) {
-  const { license } = await chrome.storage.local.get('license');
-  if (!license?.isPro) return;
-  license.tokenBalance = tokenBalance;
-  license.topupBalance = topupBalance;
-  await chrome.storage.local.set({ license });
-}
-
-/**
  * Default free license object
  */
 function getDefaultFreeLicense() {
@@ -332,7 +278,7 @@ function getDefaultFreeLicense() {
     isPro: false,
     plan: 'free',
     limits: {
-      scansPerDay: 10,
+      scansPerDay: 20,
       caching: false,
       batchScanning: false,
       maxBatchSize: 0,
@@ -348,6 +294,4 @@ if (typeof self !== 'undefined') {
   self.getLicense = getLicense;
   self.canScan = canScan;
   self.incrementDailyScans = incrementDailyScans;
-  self.decrementTokenBalance = decrementTokenBalance;
-  self.syncTokenBalance = syncTokenBalance;
 }

@@ -442,7 +442,6 @@ const WidgetPool = {
   widget: null,
   isVisible: false,
   currentImage: null,
-  _pendingImage: null,  // immune to hide() — persists until scan starts
   cleanupFns: [],
 
   init() {
@@ -459,36 +458,34 @@ const WidgetPool = {
       </button>
     `;
     
+    // Attach click handler with multiple methods for reliability
     const button = this.widget.querySelector('.ai-widget-btn');
-
-    // Dedup flag prevents both pointerdown+click from firing the scan twice
-    let _scanFired = false;
+    
     const handleClick = (e) => {
-      if (_scanFired) return;
-      _scanFired = true;
-      setTimeout(() => { _scanFired = false; }, 600);
-
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      log('🖱️ Investigate clicked via:', e.type);
+      log('🖱️ Widget button clicked via:', e.type);
 
-      // _pendingImage is set in show() and NOT cleared by hide() — race-condition safe
-      const imgToScan = WidgetPool._pendingImage || WidgetPool.currentImage;
-      WidgetPool._pendingImage = null;
+      // Save ref BEFORE hide() nullifies currentImage
+      const imgToScan = WidgetPool.currentImage;
       if (imgToScan) {
-        log('🎯 Scanning:', imgToScan.src?.substring(0, 60));
+        log('🎯 Scanning image:', imgToScan.src?.substring(0, 50));
         WidgetPool.hide();
         scanImage(imgToScan);
       } else {
-        console.warn('⚠️ No image to scan — widget shown without setting _pendingImage');
+        console.warn('⚠️ No current image to scan');
       }
+      return false;
     };
-
-    // Two handlers: pointerdown fires before click (covers sites that block click)
-    // dedup flag ensures only one scan runs per user gesture
-    button.addEventListener('pointerdown', handleClick, true);
-    button.addEventListener('click', handleClick, true);
+    
+    // AGGRESSIVE: 6 different event handlers
+    button.onclick = handleClick;  // Method 1: Direct
+    button.addEventListener('click', handleClick, false);  // Method 2: Bubble
+    button.addEventListener('click', handleClick, true);   // Method 3: Capture
+    button.addEventListener('mousedown', handleClick, true);  // Method 4: Mousedown
+    button.addEventListener('mouseup', handleClick, true);    // Method 5: Mouseup
+    button.addEventListener('pointerdown', handleClick, true); // Method 6: Pointer
     
     // Cancel the hide timer when mouse enters the button widget itself
     this.widget.addEventListener('mouseenter', () => {
@@ -501,9 +498,8 @@ const WidgetPool = {
 
   show(img) {
     if (!this.widget) this.init();
-    this._pendingImage = img;  // always update, even on early return
     if (this.currentImage === img && this.isVisible) return;
-
+    
     this.currentImage = img;
     this.isVisible = true;
     this.position(img);
@@ -749,28 +745,18 @@ async function scanImage(img) {
       
       log('✅ Scan complete!');
     } else if (result?.error === 'DAILY_LIMIT_REACHED') {
+      // v1.5: Server-enforced daily limit reached
       log('🚫 Daily limit reached (server-enforced)');
       removeLoadingBadge(img);
       showUpgradePrompt(img, {
         message: result.indicators?.[0] || '🔒 Daily limit reached',
         upgradeUrl: result.upgradeUrl || 'https://fauxspy.com/pro'
       });
-    } else if (result?.error === 'TOKENS_EXHAUSTED') {
-      log('🚫 Token balance exhausted');
-      state.scannedImages.delete(bestUrl);
-      removeLoadingBadge(img);
-      showUpgradePrompt(img, {
-        message: '🔒 Token balance exhausted',
-        upgradeUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
-        upgradeLabel: 'Buy More Tokens'
-      });
     } else {
-      state.scannedImages.delete(bestUrl); // allow retry on error
       console.error('❌ Scan failed:', result);
       showError(img, result?.error || 'Analysis failed');
     }
   } catch (error) {
-    state.scannedImages.delete(bestUrl); // allow retry on exception
     console.error('❌ Scan error:', error);
     removeLoadingBadge(img);
     showError(img, error.message);
@@ -781,24 +767,9 @@ async function checkUsageLimit() {
   const { license, dailyScans, lastResetDate } = await chrome.storage.local.get([
     'license', 'dailyScans', 'lastResetDate'
   ]);
-
+  
   if (license?.isPro) {
-    // Token system active: check local cache before server round-trip
-    if (license.tokenBalance !== undefined) {
-      const total = (license.tokenBalance || 0) + (license.topupBalance || 0);
-      if (total <= 0) {
-        return {
-          allowed: false,
-          remaining: 0,
-          isPro: true,
-          tokensExhausted: true,
-          message: '🔒 Token balance exhausted',
-          upgradeUrl: 'https://fauxspy.com/buy-tokens',
-          upgradeLabel: 'Buy More Tokens'
-        };
-      }
-    }
-    return { allowed: true, remaining: (license.tokenBalance || 0) + (license.topupBalance || 0), isPro: true };
+    return { allowed: true, remaining: -1, isPro: true };
   }
   
   const today = new Date().toDateString();
@@ -968,19 +939,15 @@ function showUpgradePrompt(img, usageCheck) {
   const wrapper = getOrCreateWrapper(img);
   const badge = document.createElement('div');
   badge.className = 'ai-badge ai-badge-upgrade';
-  const labelText = usageCheck.upgradeLabel || 'Upgrade';
-  badge.innerHTML = `<span>⭐</span><span>${labelText}</span>`;
-  badge.title = `${usageCheck.message}\nClick for details`;
+  badge.innerHTML = '<span>⭐</span><span>Upgrade</span>';
+  badge.title = `${usageCheck.message}\nClick to see plans`;
   badge.style.cursor = 'pointer';
-
+  
   badge.addEventListener('click', (e) => {
     e.stopPropagation();
-    chrome.runtime.sendMessage({
-      action: 'openUpgrade',
-      url: usageCheck.upgradeUrl || null
-    });
+    chrome.runtime.sendMessage({ action: 'openUpgrade' });
   });
-
+  
   wrapper.appendChild(badge);
 }
 
@@ -1043,7 +1010,6 @@ function getOrCreateOverlay(img) {
   
   // Watch for image position changes (Instagram dynamically repositions)
   if (window.ResizeObserver) {
-    if (overlay._resizeObserver) overlay._resizeObserver.disconnect();
     const resizeObs = new ResizeObserver(updatePos);
     resizeObs.observe(img);
     overlay._resizeObserver = resizeObs;
@@ -1192,7 +1158,7 @@ document.addEventListener('mouseleave', (e) => {
       if (!WidgetPool.widget?.matches(':hover')) {
         WidgetPool.hide();
       }
-    }, 400); // 400ms — room for slow cursors to reach the button
+    }, 200); // 200ms gives button clicks time to register
   }
 }, true);
 
@@ -1520,18 +1486,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     clearAllHighlights();
     sendResponse({ success: true });
   }
-
-  if (request.action === 'showContextResult') {
-    removeLoadingBadge(null);
-    if (request.result && !request.result.error) {
-      showAnimatedResultPanel(null, request.result);
-    } else {
-      console.warn('Context scan failed:', request.result?.error);
-    }
-    sendResponse({ success: true });
-    return true;
-  }
-
+  
   // Handle sensitivity change from settings
   if (request.action === 'sensitivityChanged') {
     state.sensitivity = request.sensitivity;
@@ -1565,11 +1520,6 @@ if (document.readyState === 'loading') {
 // v8.1: ANIMATED RESULT PANEL
 // ============================================================================
 
-function escapeHtml(str) {
-  if (typeof str !== 'string') return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
-
 function showAnimatedResultPanel(img, result) {
   // Remove any existing panel
   const existing = document.querySelector('.ai-result-panel-v8');
@@ -1595,8 +1545,8 @@ function showAnimatedResultPanel(img, result) {
     <div class="ai-panel-body">
       ${imageUrl ? `
         <div class="ai-panel-preview">
-          <img src="${imageUrl.replace(/"/g, '%22')}" alt="Scanned image" />
-          <div class="ai-panel-preview-name">${escapeHtml(imageName)}</div>
+          <img src="${imageUrl}" alt="Scanned image" />
+          <div class="ai-panel-preview-name">${imageName}</div>
         </div>
       ` : ''}
       
@@ -1646,7 +1596,7 @@ function showAnimatedResultPanel(img, result) {
       ${result.indicators && result.indicators.length > 0 ? `
         <div class="ai-panel-indicators">
           <div class="ai-indicators-title">Investigation Notes:</div>
-          ${result.indicators.map(ind => `<div class="ai-indicator-item">${escapeHtml(String(ind))}</div>`).join('')}
+          ${result.indicators.map(ind => `<div class="ai-indicator-item">${ind}</div>`).join('')}
         </div>
       ` : ''}
       
@@ -1791,7 +1741,7 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
     </div>
     
     <div class="ai-share-preview">
-      <pre id="ai-share-text-content"></pre>
+      <pre>${shareText}</pre>
     </div>
     
     <div class="ai-share-options">
@@ -1843,8 +1793,7 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
   `;
   
   document.body.appendChild(menu);
-  menu.querySelector('#ai-share-text-content').textContent = shareText;
-
+  
   // Close handlers
   const closeMenu = () => menu.remove();
   menu.querySelector('.ai-share-close').onclick = closeMenu;

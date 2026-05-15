@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Screenshot 5 - Case Files & Stats (1280x800)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1419;
+  color: #f8fafc;
+}
+
+.layout { display: flex; height: 100%; }
+
+/* Left: browser with content */
+.browser-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #111827;
+}
+
+.nav-bar {
+  background: #161b27;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+.nav-btn { width: 26px; height: 26px; border-radius: 5px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #64748b; }
+.url-bar { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 5px 14px; font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+
+.page-body {
+  flex: 1;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pg-img { border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 40px; position: relative; }
+.pg-img.c1 { background: linear-gradient(135deg,#1a1020,#2d1535); }
+.pg-img.c2 { background: linear-gradient(135deg,#0f1a10,#152d15); }
+.pg-img.c3 { background: linear-gradient(135deg,#11102a,#1e1a35); }
+.pg-img.c4 { background: linear-gradient(135deg,#1a1f2e,#252d3d); }
+
+.pg-badge { position: absolute; top: 6px; left: 6px; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; }
+.pg-badge.ai { background: rgba(239,68,68,0.9); color: white; }
+.pg-badge.real { background: rgba(16,185,129,0.9); color: white; }
+.pg-badge.art { background: rgba(139,92,246,0.9); color: white; }
+
+/* Right: case files panel */
+.panel {
+  width: 420px;
+  background: radial-gradient(circle at 20% 0%, rgba(251,191,36,0.06) 0%, transparent 50%),
+              #0a0e1a;
+  border-left: 1px solid rgba(251,191,36,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-hdr {
+  padding: 16px;
+  border-bottom: 1px solid rgba(251,191,36,0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.p-logo { width: 38px; height: 38px; background: linear-gradient(135deg,#fbbf24,#d97706); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 12px rgba(251,191,36,0.3); }
+.p-name { font-size: 18px; font-weight: 800; font-family: 'Georgia', serif; font-style: italic; background: linear-gradient(135deg,#fbbf24,#d97706); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.p-sub { font-size: 9px; color: #fde68a; font-weight: 500; }
+
+/* Big stats */
+.big-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-bottom: 1px solid rgba(251,191,36,0.08);
+  flex-shrink: 0;
+}
+.big-stat {
+  padding: 16px;
+  text-align: center;
+  border-right: 1px solid rgba(251,191,36,0.08);
+}
+.big-stat:last-child { border-right: none; }
+.bs-val { font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.bs-val.g { background: linear-gradient(135deg,#fbbf24,#d97706); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.bs-val.r { background: linear-gradient(135deg,#ef4444,#dc2626); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.bs-val.gr { background: linear-gradient(135deg,#10b981,#059669); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.bs-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+/* Achievements section */
+.ach-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(251,191,36,0.06);
+  flex-shrink: 0;
+}
+.section-title { font-size: 10px; font-weight: 700; color: #fde68a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.ach-row { display: flex; gap: 8px; }
+.ach {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+.ach.unlocked { background: linear-gradient(135deg, rgba(251,191,36,0.12), rgba(217,119,6,0.08)); border: 1px solid rgba(251,191,36,0.25); color: #fde68a; }
+.ach.locked { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); color: #475569; }
+.ach-emoji { font-size: 22px; }
+.ach-name { font-size: 10px; font-weight: 700; }
+
+/* Case files list */
+.case-section { flex: 1; overflow: hidden; padding: 12px 16px; display: flex; flex-direction: column; }
+.case-list { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+.case-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.case-row.ai-case { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); }
+.case-row.real-case { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); }
+.case-row.art-case { background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.15); }
+.case-emoji { font-size: 22px; flex-shrink: 0; }
+.case-info { flex: 1; min-width: 0; }
+.case-type { font-size: 11px; font-weight: 700; }
+.case-type.ai-t { color: #f87171; }
+.case-type.real-t { color: #34d399; }
+.case-type.art-t { color: #a78bfa; }
+.case-meta { font-size: 10px; color: #475569; }
+.case-pct { font-size: 14px; font-weight: 800; flex-shrink: 0; }
+.case-pct.ai-p { color: #f87171; }
+.case-pct.real-p { color: #34d399; }
+.case-pct.art-p { color: #a78bfa; }
+
+/* Pro CTA */
+.pro-cta {
+  margin: 0 16px 14px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(251,191,36,0.12), rgba(217,119,6,0.08));
+  border: 1px solid rgba(251,191,36,0.3);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.cta-text { font-size: 12px; color: #cbd5e1; line-height: 1.4; }
+.cta-text strong { color: #fde68a; display: block; margin-bottom: 2px; font-size: 13px; }
+.cta-btn { padding: 8px 16px; background: linear-gradient(135deg,#fbbf24,#d97706); color: #0a0e1a; border: none; border-radius: 8px; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 8px rgba(251,191,36,0.3); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="browser-side">
+    <div class="nav-bar">
+      <div class="nav-btn">←</div>
+      <div class="nav-btn">→</div>
+      <div class="nav-btn">↺</div>
+      <div class="url-bar">
+        <span style="color:#10b981;font-size:11px;">🔒</span>
+        <span>reddit.com/r/pics/</span>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="pg-img c1">🌺<div class="pg-badge ai">AI</div></div>
+      <div class="pg-img c2">🏕️<div class="pg-badge real">Real</div></div>
+      <div class="pg-img c1">🌃<div class="pg-badge ai">AI</div></div>
+      <div class="pg-img c3">✨<div class="pg-badge art">Art</div></div>
+      <div class="pg-img c2">🤳<div class="pg-badge real">Real</div></div>
+      <div class="pg-img c1">🦁<div class="pg-badge ai">AI</div></div>
+      <div class="pg-img c2">🌊<div class="pg-badge real">Real</div></div>
+      <div class="pg-img c1">🏙️<div class="pg-badge ai">AI</div></div>
+      <div class="pg-img c3">🎨<div class="pg-badge art">Art</div></div>
+      <div class="pg-img c1">🌸<div class="pg-badge ai">AI</div></div>
+      <div class="pg-img c2">🏔️<div class="pg-badge real">Real</div></div>
+      <div class="pg-img c1">👤<div class="pg-badge ai">AI</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="p-logo">🔍</div>
+      <div>
+        <div class="p-name">Faux Spy</div>
+        <div class="p-sub">🕵️ Case Files &amp; Stats</div>
+      </div>
+    </div>
+
+    <div class="big-stats">
+      <div class="big-stat"><div class="bs-val g">247</div><div class="bs-lbl">Total Cases</div></div>
+      <div class="big-stat"><div class="bs-val r">163</div><div class="bs-lbl">AI Fakes</div></div>
+      <div class="big-stat"><div class="bs-val gr">84</div><div class="bs-lbl">Verified Real</div></div>
+    </div>
+
+    <div class="ach-section">
+      <div class="section-title">🏆 Detective Badges</div>
+      <div class="ach-row">
+        <div class="ach unlocked"><span class="ach-emoji">🥇</span><span class="ach-name">First Catch</span></div>
+        <div class="ach unlocked"><span class="ach-emoji">👁️</span><span class="ach-name">Sharp Eye</span></div>
+        <div class="ach unlocked"><span class="ach-emoji">🎯</span><span class="ach-name">Faux Hunter</span></div>
+        <div class="ach locked"><span class="ach-emoji">🕵️</span><span class="ach-name">Master Spy</span></div>
+      </div>
+    </div>
+
+    <div class="case-section">
+      <div class="section-title" style="font-size:10px;font-weight:700;color:#fde68a;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📁 Recent Case Files</div>
+      <div class="case-list">
+        <div class="case-row ai-case">
+          <span class="case-emoji">🌺</span>
+          <div class="case-info">
+            <div class="case-type ai-t">🤖 AI Generated</div>
+            <div class="case-meta">reddit.com/r/pics · 2 min ago</div>
+          </div>
+          <div class="case-pct ai-p">96%</div>
+        </div>
+        <div class="case-row real-case">
+          <span class="case-emoji">🏕️</span>
+          <div class="case-info">
+            <div class="case-type real-t">✅ Real Photo</div>
+            <div class="case-meta">reddit.com/r/pics · 3 min ago</div>
+          </div>
+          <div class="case-pct real-p">98%</div>
+        </div>
+        <div class="case-row ai-case">
+          <span class="case-emoji">🌃</span>
+          <div class="case-info">
+            <div class="case-type ai-t">🤖 AI Generated</div>
+            <div class="case-meta">instagram.com · 5 min ago</div>
+          </div>
+          <div class="case-pct ai-p">91%</div>
+        </div>
+        <div class="case-row art-case">
+          <span class="case-emoji">✨</span>
+          <div class="case-info">
+            <div class="case-type art-t">🎨 Digital Art</div>
+            <div class="case-meta">pinterest.com · 8 min ago</div>
+          </div>
+          <div class="case-pct art-p">94%</div>
+        </div>
+        <div class="case-row real-case">
+          <span class="case-emoji">🤳</span>
+          <div class="case-info">
+            <div class="case-type real-t">✅ Real Photo</div>
+            <div class="case-meta">x.com · 12 min ago</div>
+          </div>
+          <div class="case-pct real-p">97%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pro-cta">
+      <div class="cta-text">
+        <strong>🔒 Unlock Full Case Files</strong>
+        Unlimited history, export, and Deep Dive mode
+      </div>
+      <button class="cta-btn">Go Pro</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

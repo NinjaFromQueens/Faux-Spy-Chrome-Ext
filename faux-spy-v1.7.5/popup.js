@@ -23,7 +23,6 @@ const DOM = {
   settingsBtn: null,
   upgradeBtn: null,
   manageBtn: null,
-  buyTokensBtn: null,
   
   // Text elements
   scanText: null,
@@ -32,7 +31,6 @@ const DOM = {
   totalScanned: null,
   aiCount: null,
   humanCount: null,
-  tokenBalanceText: null,
   
   // Toast
   toast: null,
@@ -47,8 +45,7 @@ const DOM = {
     this.settingsBtn = document.getElementById('settingsBtn');
     this.upgradeBtn = document.getElementById('upgradeBtn');
     this.manageBtn = document.getElementById('manageBtn');
-    this.buyTokensBtn = document.getElementById('buyTokensBtn');
-
+    
     this.scanText = document.getElementById('scanText');
     this.scansUsed = document.getElementById('scansUsed');
     this.progressFill = document.getElementById('progressFill');
@@ -57,7 +54,6 @@ const DOM = {
     this.humanCount = document.getElementById('humanCount');
     
     this.toast = document.getElementById('toast');
-    this.tokenBalanceText = document.getElementById('tokenBalanceText');
   }
 };
 
@@ -92,21 +88,6 @@ const UI = {
     if (license?.isPro) {
       DOM.proCard.hidden = false;
       DOM.usageCard.hidden = true;
-
-      // Show token balance if token system is active
-      if (DOM.tokenBalanceText && license.tokenBalance !== undefined) {
-        const total = (license.tokenBalance || 0) + (license.topupBalance || 0);
-        DOM.tokenBalanceText.textContent = total.toLocaleString();
-        if (total === 0) {
-          DOM.tokenBalanceText.style.color = '#ef4444';
-        } else if (total < 20) {
-          DOM.tokenBalanceText.style.color = '#f59e0b';
-        } else {
-          DOM.tokenBalanceText.style.color = '';
-        }
-        const row = document.getElementById('tokenBalanceRow');
-        if (row) row.style.display = 'flex';
-      }
     } else {
       DOM.proCard.hidden = true;
       DOM.usageCard.hidden = false;
@@ -115,7 +96,7 @@ const UI = {
       DOM.scansUsed.textContent = usage.used;
       const limitEl = document.getElementById('scansLimit');
       if (limitEl) limitEl.textContent = usage.limit;
-      const percentage = Math.min(100, Math.round((usage.used / Math.max(1, usage.limit)) * 100));
+      const percentage = Math.min(100, Math.round((usage.used / usage.limit) * 100));
       DOM.progressFill.style.width = `${percentage}%`;
       
       // Change color based on usage (v1.4.1: scales to actual limit)
@@ -283,13 +264,9 @@ function handleUpgrade() {
 }
 
 function handleManage() {
+  // v1.6: Open Stripe customer portal via fauxspy.com/account
+  // This page should redirect to Stripe billing portal for subscription management
   chrome.tabs.create({ url: 'https://fauxspy.com/account' });
-}
-
-async function handleBuyTokens() {
-  const { license } = await chrome.storage.local.get('license');
-  const key = license?.key ? `?key=${encodeURIComponent(license.key)}` : '';
-  chrome.tabs.create({ url: `https://fauxspy.com/buy-tokens${key}` });
 }
 
 // ============================================================================
@@ -311,7 +288,6 @@ async function init() {
   DOM.settingsBtn?.addEventListener('click', handleSettings);
   DOM.upgradeBtn?.addEventListener('click', handleUpgrade);
   DOM.manageBtn?.addEventListener('click', handleManage);
-  DOM.buyTokensBtn?.addEventListener('click', handleBuyTokens);
   
   // v8.2: Scan mode buttons
   document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -322,7 +298,7 @@ async function init() {
       if (btn.classList.contains('mode-btn-pro')) {
         // Check if user has Pro license
         const { license } = await chrome.storage.local.get('license');
-        const isPro = license?.isPro;
+        const isPro = license && license.isValid;
         
         if (!isPro) {
           // Open Pro upgrade page in new tab

@@ -161,6 +161,9 @@ async function processQueue() {
   }
 }
 
+// v1.5: Backend proxy URL - hides Sightengine API key
+const FAUXSPY_API_BASE = 'https://fauxspy.com';
+
 function getPlatformDisplayName(host) {
   host = (host || '').toLowerCase();
   if (host.includes('instagram') || host.includes('cdninstagram')) return 'Instagram';
@@ -258,18 +261,15 @@ async function analyzeWithProxy(imageData, license) {
   }
   
   const isPro = license?.isPro === true;
-  const licenseKey = isPro ? (license?.key || null) : null;
-
+  
   try {
-    const response = await fetch(`${BACKEND_URL}/api/detect`, {
+    const response = await fetch(`${FAUXSPY_API_BASE}/api/detect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         imageUrl: imageData.src,
         userId,
         isPro,
-        // Pass license key so backend can check and deduct tokens
-        ...(licenseKey ? { licenseKey } : {}),
         // v1.5.1: Pass dimensions for backend pre-checks
         width: imageData.width || 0,
         height: imageData.height || 0,
@@ -311,21 +311,6 @@ async function analyzeWithProxy(imageData, license) {
       };
     }
 
-    // Tokens exhausted (Pro users only)
-    if (response.status === 402 || data.error === 'TOKENS_EXHAUSTED') {
-      return {
-        isAI: false,
-        aiProbability: 0,
-        confidence: 0,
-        indicators: ['🔒 Token balance exhausted', 'Purchase more tokens to continue'],
-        method: 'error',
-        error: 'TOKENS_EXHAUSTED',
-        buyUrl: data.buyUrl || 'https://fauxspy.com/buy-tokens',
-        tokenBalance: 0,
-        topupBalance: 0,
-      };
-    }
-
     // Other error responses
     if (!response.ok || !data.success) {
       console.warn('⚠️ Proxy returned error:', data);
@@ -334,17 +319,6 @@ async function analyzeWithProxy(imageData, license) {
         error: data.error || 'PROXY_ERROR',
         indicators: [data.message || 'Detection service unavailable']
       };
-    }
-
-    // Sync token balance into local storage if server returned updated values
-    if (isPro && licenseKey && typeof data.tokenBalance === 'number') {
-      chrome.storage.local.get('license', ({ license: storedLicense }) => {
-        if (storedLicense?.isPro) {
-          storedLicense.tokenBalance = data.tokenBalance;
-          storedLicense.topupBalance = data.topupBalance ?? storedLicense.topupBalance ?? 0;
-          chrome.storage.local.set({ license: storedLicense });
-        }
-      });
     }
     
     // Success! Return result
@@ -1111,6 +1085,42 @@ async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pa
   }
 }
 
+/**
+ * Example integration with a real AI detection API
+ * Uncomment and configure when you have an API key
+ */
+/*
+async function analyzeWithAPI(imageUrl) {
+  const API_KEY = 'your-api-key-here';
+  const API_ENDPOINT = 'https://api.example.com/detect';
+  
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        image_url: imageUrl
+      })
+    });
+    
+    const data = await response.json();
+    
+    return {
+      isAI: data.is_ai_generated,
+      confidence: data.confidence,
+      indicators: data.detected_features || [],
+      method: 'api'
+    };
+  } catch (error) {
+    console.error('API analysis failed:', error);
+    return null;
+  }
+}
+*/
+
 // Helper function to fetch image and analyze locally
 async function fetchAndAnalyzeImage(imageUrl) {
   try {
@@ -1133,11 +1143,7 @@ async function fetchAndAnalyzeImage(imageUrl) {
 // Message handlers
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'openUpgrade') {
-    const fallback = chrome.runtime.getURL('upgrade.html');
-    const url = (typeof request.url === 'string' && request.url.startsWith('https://fauxspy.com/'))
-      ? request.url
-      : fallback;
-    chrome.tabs.create({ url });
+    chrome.tabs.create({ url: chrome.runtime.getURL('upgrade.html') });
     return true;
   }
   

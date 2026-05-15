@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Screenshot 3 - Deep Dive Pro Feature (1280x800)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1419;
+  color: #f8fafc;
+}
+
+/* Browser chrome */
+.browser-nav {
+  background: #161b27;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.nav-btn { width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #64748b; }
+.url-bar { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 6px 16px; font-size: 13px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+.ext-btn { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg,#fbbf24,#d97706); display: flex; align-items: center; justify-content: center; font-size: 16px; margin-left: 8px; box-shadow: 0 0 12px rgba(251,191,36,0.3); }
+
+/* Main layout */
+.page {
+  display: flex;
+  height: calc(100% - 48px);
+}
+
+/* LEFT: extension panel (wide) */
+.ext-panel {
+  width: 400px;
+  background: radial-gradient(circle at 20% 0%, rgba(251,191,36,0.07) 0%, transparent 50%),
+              radial-gradient(circle at 80% 100%, rgba(139,92,246,0.07) 0%, transparent 50%),
+              #0a0e1a;
+  border-right: 1px solid rgba(251,191,36,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panel-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(251,191,36,0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.panel-logo { width: 40px; height: 40px; background: linear-gradient(135deg,#fbbf24,#d97706); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 14px rgba(251,191,36,0.3); }
+.panel-title { font-size: 19px; font-weight: 800; font-family: 'Georgia', serif; font-style: italic; background: linear-gradient(135deg,#fbbf24,#d97706); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.panel-sub { font-size: 10px; color: #fde68a; font-weight: 500; }
+
+/* Active mode indicator */
+.mode-indicator {
+  margin: 12px 16px 0;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.12));
+  border: 1px solid rgba(139,92,246,0.3);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mode-indicator-icon { font-size: 20px; }
+.mode-indicator-text { flex: 1; }
+.mode-indicator-title { font-size: 13px; font-weight: 700; color: #c4b5fd; }
+.mode-indicator-desc { font-size: 10px; color: #94a3b8; }
+.mode-pro-badge { padding: 3px 8px; background: linear-gradient(135deg,#fbbf24,#d97706); border-radius: 4px; font-size: 9px; font-weight: 800; color: #0a0e1a; }
+
+/* Scan results */
+.scan-header {
+  padding: 12px 16px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fde68a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.scan-count { font-size: 11px; color: #64748b; font-weight: 600; text-transform: none; }
+
+.scan-results { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid;
+}
+.result-item.ai-result { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.2); }
+.result-item.real-result { background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.2); }
+.result-item.art-result { background: rgba(139,92,246,0.06); border-color: rgba(139,92,246,0.2); }
+
+.result-thumb { width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.result-thumb.ai-t { background: rgba(239,68,68,0.15); }
+.result-thumb.real-t { background: rgba(16,185,129,0.15); }
+.result-thumb.art-t { background: rgba(139,92,246,0.15); }
+
+.result-info { flex: 1; min-width: 0; }
+.result-type { font-size: 12px; font-weight: 700; }
+.result-type.ai-t { color: #f87171; }
+.result-type.real-t { color: #34d399; }
+.result-type.art-t { color: #a78bfa; }
+.result-detail { font-size: 10px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.result-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; }
+.result-pct.ai-p { color: #f87171; }
+.result-pct.real-p { color: #34d399; }
+.result-pct.art-p { color: #a78bfa; }
+
+/* Summary section */
+.summary {
+  margin: 8px 16px;
+  padding: 12px;
+  background: rgba(251,191,36,0.03);
+  border: 1px solid rgba(251,191,36,0.1);
+  border-radius: 10px;
+}
+.summary-title { font-size: 10px; font-weight: 700; color: #fde68a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.summary-item { text-align: center; }
+.summary-val { font-size: 22px; font-weight: 800; }
+.summary-val.ai-c { background: linear-gradient(135deg,#ef4444,#dc2626); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.summary-val.real-c { background: linear-gradient(135deg,#10b981,#059669); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.summary-val.art-c { background: linear-gradient(135deg,#8b5cf6,#7c3aed); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.summary-val.total-c { background: linear-gradient(135deg,#fbbf24,#d97706); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.summary-lbl { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+
+/* RIGHT: webpage with highlights */
+.webpage {
+  flex: 1;
+  background: #111827;
+  position: relative;
+  overflow: hidden;
+}
+
+.web-content {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 12px;
+  height: 100%;
+}
+
+.web-img {
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px;
+  position: relative;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+.web-img.ai-img { background: linear-gradient(135deg, #1a1020, #2d1535); border-color: rgba(239,68,68,0.4); box-shadow: 0 0 0 1px rgba(239,68,68,0.2); }
+.web-img.real-img { background: linear-gradient(135deg, #0f1a10, #152d15); border-color: rgba(16,185,129,0.3); }
+.web-img.art-img { background: linear-gradient(135deg, #11102a, #1e1a35); border-color: rgba(139,92,246,0.3); }
+.web-img.neutral { background: linear-gradient(135deg, #1a1f2e, #252d3d); border-color: rgba(255,255,255,0.05); }
+
+.mini-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+.mini-badge.ai { background: rgba(239,68,68,0.9); color: white; }
+.mini-badge.real { background: rgba(16,185,129,0.9); color: white; }
+.mini-badge.art { background: rgba(139,92,246,0.9); color: white; }
+
+/* Scanning overlay animation */
+.scan-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(251,191,36,0.06);
+  animation: scanLine 2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes scanLine {
+  0% { clip-path: inset(0 0 100% 0); }
+  100% { clip-path: inset(0 0 -10% 0); }
+}
+</style>
+</head>
+<body>
+<div style="display:flex; flex-direction:column; height:100%;">
+  <div class="browser-nav">
+    <div class="nav-btn">←</div>
+    <div class="nav-btn">→</div>
+    <div class="nav-btn">↺</div>
+    <div class="url-bar">
+      <span style="color:#10b981;font-size:12px;">🔒</span>
+      <span>pinterest.com/explore/aesthetic/</span>
+    </div>
+    <div class="ext-btn">🔍</div>
+  </div>
+
+  <div class="page">
+    <div class="ext-panel">
+      <div class="panel-header">
+        <div class="panel-logo">🔍</div>
+        <div>
+          <div class="panel-title">Faux Spy</div>
+          <div class="panel-sub">🕵️ Spy on the fakes</div>
+        </div>
+      </div>
+
+      <div class="mode-indicator">
+        <span class="mode-indicator-icon">🔬</span>
+        <div class="mode-indicator-text">
+          <div class="mode-indicator-title">Deep Dive Mode Active</div>
+          <div class="mode-indicator-desc">Scanning all images on page, including hidden ones</div>
+        </div>
+        <div class="mode-pro-badge">PRO</div>
+      </div>
+
+      <div class="scan-header">
+        Scan Results
+        <span class="scan-count">12 of 16 analyzed</span>
+      </div>
+
+      <div class="scan-results">
+        <div class="result-item ai-result">
+          <div class="result-thumb ai-t">🌸</div>
+          <div class="result-info">
+            <div class="result-type ai-t">🤖 AI Generated</div>
+            <div class="result-detail">Midjourney v6 · floral_portrait_001.jpg</div>
+          </div>
+          <div class="result-pct ai-p">96%</div>
+        </div>
+        <div class="result-item real-result">
+          <div class="result-thumb real-t">🤳</div>
+          <div class="result-info">
+            <div class="result-type real-t">✅ Real Photo</div>
+            <div class="result-detail">EXIF metadata present · img_4721.jpg</div>
+          </div>
+          <div class="result-pct real-p">97%</div>
+        </div>
+        <div class="result-item ai-result">
+          <div class="result-thumb ai-t">🏔️</div>
+          <div class="result-info">
+            <div class="result-type ai-t">🤖 AI Generated</div>
+            <div class="result-detail">Stable Diffusion · mountain_scene.png</div>
+          </div>
+          <div class="result-pct ai-p">89%</div>
+        </div>
+        <div class="result-item art-result">
+          <div class="result-thumb art-t">🎨</div>
+          <div class="result-info">
+            <div class="result-type art-t">🎨 Digital Art</div>
+            <div class="result-detail">CGI/3D render · artwork_render.png</div>
+          </div>
+          <div class="result-pct art-p">92%</div>
+        </div>
+        <div class="result-item ai-result">
+          <div class="result-thumb ai-t">👤</div>
+          <div class="result-info">
+            <div class="result-type ai-t">🤖 AI Generated</div>
+            <div class="result-detail">GAN face · portrait_aesthetic.jpg</div>
+          </div>
+          <div class="result-pct ai-p">99%</div>
+        </div>
+        <div class="result-item real-result">
+          <div class="result-thumb real-t">🌊</div>
+          <div class="result-info">
+            <div class="result-type real-t">✅ Real Photo</div>
+            <div class="result-detail">Camera sensor noise · ocean_2024.jpg</div>
+          </div>
+          <div class="result-pct real-p">95%</div>
+        </div>
+      </div>
+
+      <div class="summary">
+        <div class="summary-title">Page Summary</div>
+        <div class="summary-grid">
+          <div class="summary-item"><div class="summary-val total-c">16</div><div class="summary-lbl">Total</div></div>
+          <div class="summary-item"><div class="summary-val ai-c">9</div><div class="summary-lbl">AI Fakes</div></div>
+          <div class="summary-item"><div class="summary-val real-c">4</div><div class="summary-lbl">Real</div></div>
+          <div class="summary-item"><div class="summary-val art-c">3</div><div class="summary-lbl">Art/CGI</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="webpage">
+      <div class="web-content">
+        <div class="web-img ai-img">🌸<div class="mini-badge ai">AI 96%</div></div>
+        <div class="web-img real-img">🤳<div class="mini-badge real">Real 97%</div></div>
+        <div class="web-img ai-img">🏔️<div class="mini-badge ai">AI 89%</div></div>
+        <div class="web-img art-img">🎨<div class="mini-badge art">Art 92%</div></div>
+        <div class="web-img ai-img">👤<div class="mini-badge ai">AI 99%</div></div>
+        <div class="web-img real-img">🌊<div class="mini-badge real">Real 95%</div></div>
+        <div class="web-img ai-img">🌅<div class="mini-badge ai">AI 91%</div></div>
+        <div class="web-img neutral">🏙️<div class="mini-badge" style="background:rgba(251,191,36,0.9);color:#0a0e1a;">...</div></div>
+        <div class="web-img ai-img">🐕<div class="mini-badge ai">AI 87%</div></div>
+        <div class="web-img real-img">🌿<div class="mini-badge real">Real 93%</div></div>
+        <div class="web-img art-img">✨<div class="mini-badge art">Art 88%</div></div>
+        <div class="web-img neutral">🎭<div class="mini-badge" style="background:rgba(251,191,36,0.9);color:#0a0e1a;">...</div></div>
+      </div>
+      <div class="scan-overlay"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

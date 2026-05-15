@@ -45,7 +45,7 @@ chrome.runtime.onInstalled.addListener(() => {
         isPro: false,
         plan: 'free',
         limits: {
-          scansPerDay: 10,
+          scansPerDay: 20,
           caching: false,
           batchScanning: false,
           maxBatchSize: 0
@@ -80,7 +80,7 @@ async function checkLicense() {
   // No-op - license.js handles this now
   // Kept to prevent errors from old code paths
   const { license } = await chrome.storage.local.get('license');
-  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 10 } };
+  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 20 } };
 }
 
 // Listen for messages from content script
@@ -101,13 +101,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const result = await processAnalysis({ src: info.srcUrl });
     
     // Show notification in the page
-    if (tab?.id) {
-      chrome.tabs.sendMessage(tab.id, {
-        action: 'showContextResult',
-        result: result,
-        src: info.srcUrl
-      }).catch(() => {});
-    }
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'showContextResult',
+      result: result,
+      src: info.srcUrl
+    });
   }
 });
 
@@ -161,17 +159,8 @@ async function processQueue() {
   }
 }
 
-function getPlatformDisplayName(host) {
-  host = (host || '').toLowerCase();
-  if (host.includes('instagram') || host.includes('cdninstagram')) return 'Instagram';
-  if (host.includes('twitter') || host.includes('x.com') || host.includes('twimg')) return 'X (Twitter)';
-  if (host.includes('facebook') || host.includes('fbcdn')) return 'Facebook';
-  if (host.includes('pinterest') || host.includes('pinimg')) return 'Pinterest';
-  if (host.includes('reddit') || host.includes('redd.it')) return 'Reddit';
-  if (host.includes('tiktok')) return 'TikTok';
-  if (host.includes('linkedin') || host.includes('licdn')) return 'LinkedIn';
-  return null;
-}
+// v1.5: Backend proxy URL - hides Sightengine API key
+const FAUXSPY_API_BASE = 'https://fauxspy.com';
 
 async function processAnalysis(request) {
   // Extract imageData from request
@@ -235,11 +224,7 @@ async function processAnalysis(request) {
   log('⚠️ Using heuristic fallback');
   const heuristicResult = await analyzeImageHeuristic(imageData);
   heuristicResult.fallback = true;
-  const platformName = getPlatformDisplayName(imageData.pageHost || '');
-  const unavailableMsg = platformName
-    ? `⚠️ Detection service temporarily unavailable on ${platformName}`
-    : '⚠️ Detection service temporarily unavailable';
-  heuristicResult.indicators.unshift(unavailableMsg);
+  heuristicResult.indicators.unshift('⚠️ Detection service temporarily unavailable');
   return heuristicResult;
 }
 
@@ -258,18 +243,15 @@ async function analyzeWithProxy(imageData, license) {
   }
   
   const isPro = license?.isPro === true;
-  const licenseKey = isPro ? (license?.key || null) : null;
-
+  
   try {
-    const response = await fetch(`${BACKEND_URL}/api/detect`, {
+    const response = await fetch(`${FAUXSPY_API_BASE}/api/detect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         imageUrl: imageData.src,
         userId,
         isPro,
-        // Pass license key so backend can check and deduct tokens
-        ...(licenseKey ? { licenseKey } : {}),
         // v1.5.1: Pass dimensions for backend pre-checks
         width: imageData.width || 0,
         height: imageData.height || 0,
@@ -277,28 +259,18 @@ async function analyzeWithProxy(imageData, license) {
         pageHost: imageData.pageHost || ''
       })
     });
-
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      return {
-        method: 'error',
-        error: 'PARSE_ERROR',
-        indicators: ['Invalid response from detection service']
-      };
-    }
+    
+    const data = await response.json();
     
     // Daily limit reached - special handling
     if (response.status === 429 || data.error === 'DAILY_LIMIT_REACHED') {
-      const limit = data.limit || 5;
       return {
         isAI: false,
         aiProbability: 0,
         confidence: 0,
         indicators: [
           '🔒 Daily limit reached',
-          `Used ${data.used || limit} of ${limit} free investigations today`,
+          `Used ${data.used || 20} of ${data.limit || 20} free investigations today`,
           '👉 Upgrade to Pro for unlimited'
         ],
         method: 'error',
@@ -306,26 +278,11 @@ async function analyzeWithProxy(imageData, license) {
         upgradeUrl: data.upgradeUrl || 'https://fauxspy.com/pro',
         dailyLimitInfo: {
           used: data.used,
-          limit
+          limit: data.limit
         }
       };
     }
-
-    // Tokens exhausted (Pro users only)
-    if (response.status === 402 || data.error === 'TOKENS_EXHAUSTED') {
-      return {
-        isAI: false,
-        aiProbability: 0,
-        confidence: 0,
-        indicators: ['🔒 Token balance exhausted', 'Purchase more tokens to continue'],
-        method: 'error',
-        error: 'TOKENS_EXHAUSTED',
-        buyUrl: data.buyUrl || 'https://fauxspy.com/buy-tokens',
-        tokenBalance: 0,
-        topupBalance: 0,
-      };
-    }
-
+    
     // Other error responses
     if (!response.ok || !data.success) {
       console.warn('⚠️ Proxy returned error:', data);
@@ -334,17 +291,6 @@ async function analyzeWithProxy(imageData, license) {
         error: data.error || 'PROXY_ERROR',
         indicators: [data.message || 'Detection service unavailable']
       };
-    }
-
-    // Sync token balance into local storage if server returned updated values
-    if (isPro && licenseKey && typeof data.tokenBalance === 'number') {
-      chrome.storage.local.get('license', ({ license: storedLicense }) => {
-        if (storedLicense?.isPro) {
-          storedLicense.tokenBalance = data.tokenBalance;
-          storedLicense.topupBalance = data.topupBalance ?? storedLicense.topupBalance ?? 0;
-          chrome.storage.local.set({ license: storedLicense });
-        }
-      });
     }
     
     // Success! Return result
@@ -365,16 +311,11 @@ async function analyzeWithProxy(imageData, license) {
     
   } catch (error) {
     console.error('❌ Proxy call failed:', error);
-    const platform = getPlatformDisplayName(imageData.pageHost || '');
     return {
       method: 'error',
       error: 'NETWORK_ERROR',
       errorDetail: error.message,
-      indicators: [
-        platform
-          ? `Could not reach Faux Spy on ${platform} — check your connection`
-          : 'Backend unavailable — check your connection'
-      ]
+      indicators: ['Backend unavailable - check connection']
     };
   }
 }
@@ -1111,6 +1052,42 @@ async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pa
   }
 }
 
+/**
+ * Example integration with a real AI detection API
+ * Uncomment and configure when you have an API key
+ */
+/*
+async function analyzeWithAPI(imageUrl) {
+  const API_KEY = 'your-api-key-here';
+  const API_ENDPOINT = 'https://api.example.com/detect';
+  
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        image_url: imageUrl
+      })
+    });
+    
+    const data = await response.json();
+    
+    return {
+      isAI: data.is_ai_generated,
+      confidence: data.confidence,
+      indicators: data.detected_features || [],
+      method: 'api'
+    };
+  } catch (error) {
+    console.error('API analysis failed:', error);
+    return null;
+  }
+}
+*/
+
 // Helper function to fetch image and analyze locally
 async function fetchAndAnalyzeImage(imageUrl) {
   try {
@@ -1133,11 +1110,7 @@ async function fetchAndAnalyzeImage(imageUrl) {
 // Message handlers
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'openUpgrade') {
-    const fallback = chrome.runtime.getURL('upgrade.html');
-    const url = (typeof request.url === 'string' && request.url.startsWith('https://fauxspy.com/'))
-      ? request.url
-      : fallback;
-    chrome.tabs.create({ url });
+    chrome.tabs.create({ url: chrome.runtime.getURL('upgrade.html') });
     return true;
   }
   

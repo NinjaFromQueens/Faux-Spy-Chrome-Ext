@@ -442,7 +442,6 @@ const WidgetPool = {
   widget: null,
   isVisible: false,
   currentImage: null,
-  _pendingImage: null,  // immune to hide() — persists until scan starts
   cleanupFns: [],
 
   init() {
@@ -459,51 +458,41 @@ const WidgetPool = {
       </button>
     `;
     
+    // Attach click handler with multiple methods for reliability
     const button = this.widget.querySelector('.ai-widget-btn');
-
-    // Dedup flag prevents both pointerdown+click from firing the scan twice
-    let _scanFired = false;
+    
     const handleClick = (e) => {
-      if (_scanFired) return;
-      _scanFired = true;
-      setTimeout(() => { _scanFired = false; }, 600);
-
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      log('🖱️ Investigate clicked via:', e.type);
-
-      // _pendingImage is set in show() and NOT cleared by hide() — race-condition safe
-      const imgToScan = WidgetPool._pendingImage || WidgetPool.currentImage;
-      WidgetPool._pendingImage = null;
-      if (imgToScan) {
-        log('🎯 Scanning:', imgToScan.src?.substring(0, 60));
+      log('🖱️ Widget button clicked via:', e.type);
+      
+      if (WidgetPool.currentImage) {
+        log('🎯 Scanning image:', WidgetPool.currentImage.src?.substring(0, 50));
         WidgetPool.hide();
-        scanImage(imgToScan);
+        scanImage(WidgetPool.currentImage);
       } else {
-        console.warn('⚠️ No image to scan — widget shown without setting _pendingImage');
+        console.warn('⚠️ No current image to scan');
       }
+      return false;
     };
-
-    // Two handlers: pointerdown fires before click (covers sites that block click)
-    // dedup flag ensures only one scan runs per user gesture
-    button.addEventListener('pointerdown', handleClick, true);
-    button.addEventListener('click', handleClick, true);
     
-    // Cancel the hide timer when mouse enters the button widget itself
-    this.widget.addEventListener('mouseenter', () => {
-      clearTimeout(state.hideTimeout);
-    }, true);
-
+    // AGGRESSIVE: 6 different event handlers
+    button.onclick = handleClick;  // Method 1: Direct
+    button.addEventListener('click', handleClick, false);  // Method 2: Bubble
+    button.addEventListener('click', handleClick, true);   // Method 3: Capture
+    button.addEventListener('mousedown', handleClick, true);  // Method 4: Mousedown
+    button.addEventListener('mouseup', handleClick, true);    // Method 5: Mouseup
+    button.addEventListener('pointerdown', handleClick, true); // Method 6: Pointer
+    
     log('✅ Widget initialized with 6 click handlers');
     return this.widget;
   },
 
   show(img) {
     if (!this.widget) this.init();
-    this._pendingImage = img;  // always update, even on early return
     if (this.currentImage === img && this.isVisible) return;
-
+    
     this.currentImage = img;
     this.isVisible = true;
     this.position(img);
@@ -555,51 +544,6 @@ const WidgetPool = {
 function getImageId(img) {
   if (!img) return '';
   return img.src || img.currentSrc || '';
-}
-
-// Returns the highest-quality URL available for an image.
-// Social media CDNs serve thumbnails in feeds — we upgrade before sending to the API
-// so detection accuracy matches what you'd get scanning the full-size image directly.
-function getBestImageUrl(img) {
-  if (!img) return '';
-
-  // srcset contains multiple sizes — pick the widest one (works for Instagram, most sites)
-  if (img.srcset) {
-    const best = img.srcset
-      .split(',')
-      .map(s => {
-        const parts = s.trim().split(/\s+/);
-        return { url: parts[0], width: parseInt(parts[1]) || 0 };
-      })
-      .filter(e => e.url && !e.url.startsWith('data:') && e.width > 0)
-      .sort((a, b) => b.width - a.width)[0];
-    // Only use srcset if it's meaningfully larger than a thumbnail
-    if (best && best.width >= 400) return best.url;
-  }
-
-  let url = img.src || img.currentSrc || '';
-  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return url;
-
-  try {
-    // X / Twitter: pbs.twimg.com/media/HASH?format=jpg&name=small → name=large
-    if (url.includes('pbs.twimg.com/media/')) {
-      const u = new URL(url);
-      const name = u.searchParams.get('name') || '';
-      if (name !== 'large' && name !== 'orig') {
-        u.searchParams.set('name', 'large');
-        return u.toString();
-      }
-    }
-
-    // Pinterest: /236x/ or /474x/ → /736x/
-    if (url.includes('pinimg.com/')) {
-      return url.replace(/\/(60x60_RS|60x|74x|136x136|170x|236x|474x)\//, '/736x/');
-    }
-  } catch (e) {
-    // URL parse failed — fall through to original
-  }
-
-  return url;
 }
 
 function isScannableImage(img) {
@@ -682,39 +626,35 @@ async function scanImage(img) {
     console.warn('⚠️ Scan called with null/undefined image');
     return;
   }
-
+  
   const imageId = getImageId(img);
-  // Upgrade to full-res URL before dedup check and API call.
-  // X feeds serve ?name=small, Pinterest /236x/, etc. — the low-res thumbnail
-  // causes false "Real" results. Using the large URL fixes detection accuracy.
-  const bestUrl = getBestImageUrl(img) || imageId;
-
-  if (!bestUrl) {
+  
+  if (!imageId) {
     console.warn('⚠️ Image has no src/currentSrc');
     return;
   }
-
-  if (state.scannedImages.has(bestUrl)) {
-    log('✓ Already scanned:', bestUrl);
+  
+  if (state.scannedImages.has(imageId)) {
+    log('✓ Already scanned:', imageId);
     return;
   }
-
-  log('🔍 Starting scan for:', bestUrl);
-  state.scannedImages.add(bestUrl);
+  
+  log('🔍 Starting scan for:', imageId);
+  state.scannedImages.add(imageId);
   showLoadingBadge(img);
-
+  
   try {
     const usageCheck = await checkUsageLimit();
-
+    
     if (!usageCheck.allowed) {
       log('⚠️ Usage limit reached');
       removeLoadingBadge(img);
       showUpgradePrompt(img, usageCheck);
       return;
     }
-
+    
     const imageData = {
-      src: bestUrl,
+      src: imageId,
       width: img.naturalWidth || img.width,
       height: img.naturalHeight || img.height,
       alt: img.alt || '',
@@ -749,28 +689,18 @@ async function scanImage(img) {
       
       log('✅ Scan complete!');
     } else if (result?.error === 'DAILY_LIMIT_REACHED') {
+      // v1.5: Server-enforced daily limit reached
       log('🚫 Daily limit reached (server-enforced)');
       removeLoadingBadge(img);
       showUpgradePrompt(img, {
         message: result.indicators?.[0] || '🔒 Daily limit reached',
         upgradeUrl: result.upgradeUrl || 'https://fauxspy.com/pro'
       });
-    } else if (result?.error === 'TOKENS_EXHAUSTED') {
-      log('🚫 Token balance exhausted');
-      state.scannedImages.delete(bestUrl);
-      removeLoadingBadge(img);
-      showUpgradePrompt(img, {
-        message: '🔒 Token balance exhausted',
-        upgradeUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
-        upgradeLabel: 'Buy More Tokens'
-      });
     } else {
-      state.scannedImages.delete(bestUrl); // allow retry on error
       console.error('❌ Scan failed:', result);
       showError(img, result?.error || 'Analysis failed');
     }
   } catch (error) {
-    state.scannedImages.delete(bestUrl); // allow retry on exception
     console.error('❌ Scan error:', error);
     removeLoadingBadge(img);
     showError(img, error.message);
@@ -781,24 +711,9 @@ async function checkUsageLimit() {
   const { license, dailyScans, lastResetDate } = await chrome.storage.local.get([
     'license', 'dailyScans', 'lastResetDate'
   ]);
-
+  
   if (license?.isPro) {
-    // Token system active: check local cache before server round-trip
-    if (license.tokenBalance !== undefined) {
-      const total = (license.tokenBalance || 0) + (license.topupBalance || 0);
-      if (total <= 0) {
-        return {
-          allowed: false,
-          remaining: 0,
-          isPro: true,
-          tokensExhausted: true,
-          message: '🔒 Token balance exhausted',
-          upgradeUrl: 'https://fauxspy.com/buy-tokens',
-          upgradeLabel: 'Buy More Tokens'
-        };
-      }
-    }
-    return { allowed: true, remaining: (license.tokenBalance || 0) + (license.topupBalance || 0), isPro: true };
+    return { allowed: true, remaining: -1, isPro: true };
   }
   
   const today = new Date().toDateString();
@@ -808,7 +723,8 @@ async function checkUsageLimit() {
     await chrome.storage.local.set({ dailyScans: 0, lastResetDate: today });
   }
   
-  const limit = license?.limits?.scansPerDay || 10;
+  // v1.5: Use license limit (default 20) instead of hardcoded
+  const limit = license?.limits?.scansPerDay || 20;
   return {
     allowed: scans < limit,
     remaining: Math.max(0, limit - scans),
@@ -945,20 +861,16 @@ function showError(img, message) {
     console.warn('Error:', message);
     return;
   }
-
+  
   try {
     const wrapper = getOrCreateWrapper(img);
     const badge = document.createElement('div');
     badge.className = 'ai-badge ai-badge-error';
+    badge.innerHTML = '<span>⚠️</span><span>Error</span>';
     badge.title = message;
-    badge.innerHTML = `
-      <span>⚠️</span>
-      <span>Error</span>
-      <a class="ai-badge-report" href="https://fauxspy.com/contact" target="_blank" rel="noopener" title="Report this issue to Faux Spy">↗</a>
-    `;
     wrapper.appendChild(badge);
-
-    setTimeout(() => badge.remove(), 8000);
+    
+    setTimeout(() => badge.remove(), 5000);
   } catch (e) {
     console.warn('Could not show error:', e);
   }
@@ -968,19 +880,15 @@ function showUpgradePrompt(img, usageCheck) {
   const wrapper = getOrCreateWrapper(img);
   const badge = document.createElement('div');
   badge.className = 'ai-badge ai-badge-upgrade';
-  const labelText = usageCheck.upgradeLabel || 'Upgrade';
-  badge.innerHTML = `<span>⭐</span><span>${labelText}</span>`;
-  badge.title = `${usageCheck.message}\nClick for details`;
+  badge.innerHTML = '<span>⭐</span><span>Upgrade</span>';
+  badge.title = `${usageCheck.message}\nClick to see plans`;
   badge.style.cursor = 'pointer';
-
+  
   badge.addEventListener('click', (e) => {
     e.stopPropagation();
-    chrome.runtime.sendMessage({
-      action: 'openUpgrade',
-      url: usageCheck.upgradeUrl || null
-    });
+    chrome.runtime.sendMessage({ action: 'openUpgrade' });
   });
-
+  
   wrapper.appendChild(badge);
 }
 
@@ -1043,7 +951,6 @@ function getOrCreateOverlay(img) {
   
   // Watch for image position changes (Instagram dynamically repositions)
   if (window.ResizeObserver) {
-    if (overlay._resizeObserver) overlay._resizeObserver.disconnect();
     const resizeObs = new ResizeObserver(updatePos);
     resizeObs.observe(img);
     overlay._resizeObserver = resizeObs;
@@ -1174,7 +1081,7 @@ document.addEventListener('mouseenter', (e) => {
   const img = e.target;
   
   if (img.nodeName !== 'IMG' || !isScannableImage(img)) return;
-  if (state.scannedImages.has(getBestImageUrl(img) || getImageId(img))) return;
+  if (state.scannedImages.has(getImageId(img))) return;
   
   clearTimeout(state.hoverTimeout);
   
@@ -1186,13 +1093,12 @@ document.addEventListener('mouseenter', (e) => {
 document.addEventListener('mouseleave', (e) => {
   if (e.target.nodeName === 'IMG') {
     clearTimeout(state.hoverTimeout);
-
-    // Use state.hideTimeout so the widget's mouseenter can cancel it
-    state.hideTimeout = setTimeout(() => {
+    
+    setTimeout(() => {
       if (!WidgetPool.widget?.matches(':hover')) {
         WidgetPool.hide();
       }
-    }, 400); // 400ms — room for slow cursors to reach the button
+    }, 100);
   }
 }, true);
 
@@ -1447,72 +1353,50 @@ function initializeDetector() {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'scanVisible') {
+    // v1.1: Smart scanning that waits for lazy-loaded images
     const platform = detectSocialPlatform();
     let images;
-
+    
     if (platform) {
       log(`🌐 Detected social media platform: ${platform.name}`);
       images = getAllScannableImages()
-        .filter(img => !state.scannedImages.has(getBestImageUrl(img) || getImageId(img)));
+        .filter(img => !state.scannedImages.has(getImageId(img)));
     } else {
       images = Array.from(document.querySelectorAll('img'))
         .filter(img => isScannableImage(img))
-        .filter(img => !state.scannedImages.has(getBestImageUrl(img) || getImageId(img)));
+        .filter(img => !state.scannedImages.has(getImageId(img)));
     }
-
-    // Deep Dive (Pro): scan every image on the page including off-screen/hidden ones
-    if (state.scanMode === 'deep') {
-      // For hidden images, check natural dimensions instead of rendered rect
-      const deepImages = Array.from(document.querySelectorAll('img')).filter(img => {
-        const src = img.src || img.currentSrc || '';
-        if (!src || src.startsWith('data:') || src.startsWith('blob:')) return false;
-        const w = img.naturalWidth || img.width;
-        const h = img.naturalHeight || img.height;
-        return w >= CONFIG.minImageSize && h >= CONFIG.minImageSize;
-      }).filter(img => !state.scannedImages.has(getBestImageUrl(img) || getImageId(img)));
-
-      const toScan = deepImages.slice(0, CONFIG.maxBatchSize * 5);
-      log(`🔬 [DEEP] Scanning ${toScan.length} images (including off-screen)`);
-
-      if (toScan.length === 0) {
-        sendResponse({ scanned: 0, total: 0, message: 'No unscanned images found', mode: 'deep' });
-        return true;
-      }
-
-      Promise.all(toScan.map(img => scanImage(img)))
-        .then(() => sendResponse({ scanned: toScan.length, total: toScan.length, mode: 'deep', platform: platform?.name }))
-        .catch(err => sendResponse({ error: err.message }));
-      return true;
-    }
-
-    // Detective / Quick: only scan viewport images
+    
+    // v1.1: Only scan images currently in viewport (not far below)
     const viewportHeight = window.innerHeight;
     const inViewportImages = images.filter(img => {
       const rect = img.getBoundingClientRect();
+      // Image must be at least partially in viewport, with 100px buffer
       return rect.top < viewportHeight + 100 && rect.bottom > -100;
     });
-
+    
+    // Take batch
     const toScan = inViewportImages.slice(0, CONFIG.maxBatchSize);
-
+    
     if (toScan.length === 0) {
-      sendResponse({
-        scanned: 0,
+      sendResponse({ 
+        scanned: 0, 
         total: 0,
         message: images.length > 0 ? 'Scroll to load more images' : 'No images found'
       });
-      return true;
+      return;
     }
-
+    
     log(`🔍 Investigating ${toScan.length} of ${inViewportImages.length} visible images`);
-
+    
     Promise.all(toScan.map(img => scanImage(img)))
-      .then(() => sendResponse({
-        scanned: toScan.length,
-        total: toScan.length,
-        platform: platform?.name
+      .then(() => sendResponse({ 
+        scanned: toScan.length, 
+        total: toScan.length, 
+        platform: platform?.name 
       }))
       .catch(err => sendResponse({ error: err.message }));
-
+    
     return true;
   }
   
@@ -1520,18 +1404,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     clearAllHighlights();
     sendResponse({ success: true });
   }
-
-  if (request.action === 'showContextResult') {
-    removeLoadingBadge(null);
-    if (request.result && !request.result.error) {
-      showAnimatedResultPanel(null, request.result);
-    } else {
-      console.warn('Context scan failed:', request.result?.error);
-    }
-    sendResponse({ success: true });
-    return true;
-  }
-
+  
   // Handle sensitivity change from settings
   if (request.action === 'sensitivityChanged') {
     state.sensitivity = request.sensitivity;
@@ -1565,11 +1438,6 @@ if (document.readyState === 'loading') {
 // v8.1: ANIMATED RESULT PANEL
 // ============================================================================
 
-function escapeHtml(str) {
-  if (typeof str !== 'string') return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
-
 function showAnimatedResultPanel(img, result) {
   // Remove any existing panel
   const existing = document.querySelector('.ai-result-panel-v8');
@@ -1583,6 +1451,11 @@ function showAnimatedResultPanel(img, result) {
   const imageUrl = img ? (img.src || img.currentSrc || '') : '';
   const imageName = imageUrl ? imageUrl.split('/').pop().split('?')[0].substring(0, 50) : 'Unknown image';
   
+  // Store result on image for later reference
+  if (img) {
+    img.dataset.lastResult = JSON.stringify(result);
+  }
+  
   // Create panel
   const panel = document.createElement('div');
   panel.className = 'ai-result-panel-v8';
@@ -1595,8 +1468,8 @@ function showAnimatedResultPanel(img, result) {
     <div class="ai-panel-body">
       ${imageUrl ? `
         <div class="ai-panel-preview">
-          <img src="${imageUrl.replace(/"/g, '%22')}" alt="Scanned image" />
-          <div class="ai-panel-preview-name">${escapeHtml(imageName)}</div>
+          <img src="${imageUrl}" alt="Scanned image" />
+          <div class="ai-panel-preview-name">${imageName}</div>
         </div>
       ` : ''}
       
@@ -1646,7 +1519,7 @@ function showAnimatedResultPanel(img, result) {
       ${result.indicators && result.indicators.length > 0 ? `
         <div class="ai-panel-indicators">
           <div class="ai-indicators-title">Investigation Notes:</div>
-          ${result.indicators.map(ind => `<div class="ai-indicator-item">${escapeHtml(String(ind))}</div>`).join('')}
+          ${result.indicators.map(ind => `<div class="ai-indicator-item">${ind}</div>`).join('')}
         </div>
       ` : ''}
       
@@ -1791,7 +1664,7 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
     </div>
     
     <div class="ai-share-preview">
-      <pre id="ai-share-text-content"></pre>
+      <pre>${shareText}</pre>
     </div>
     
     <div class="ai-share-options">
@@ -1843,8 +1716,7 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
   `;
   
   document.body.appendChild(menu);
-  menu.querySelector('#ai-share-text-content').textContent = shareText;
-
+  
   // Close handlers
   const closeMenu = () => menu.remove();
   menu.querySelector('.ai-share-close').onclick = closeMenu;

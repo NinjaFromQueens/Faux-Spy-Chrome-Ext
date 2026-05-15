@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Screenshot 1 - Popup Overview (1280x800)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1419;
+  color: #f8fafc;
+}
+
+.browser {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Browser chrome */
+.browser-top {
+  background: #1a1f2e;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.browser-tabs {
+  display: flex;
+  align-items: flex-end;
+  padding: 8px 12px 0 12px;
+  gap: 2px;
+}
+.tab {
+  padding: 8px 20px 8px 14px;
+  background: #252d3d;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+}
+.tab.active {
+  background: #111827;
+  color: #f8fafc;
+}
+.tab-icon { font-size: 14px; }
+.tab-close { margin-left: auto; color: #64748b; font-size: 14px; }
+
+.browser-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #111827;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.nav-btn {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #64748b;
+}
+.url-bar {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.url-lock { font-size: 12px; color: #10b981; }
+.url-text { color: #cbd5e1; }
+.ext-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(251,191,36,0.3);
+  margin-left: 8px;
+}
+
+/* Page content (blurred instagram-like) */
+.page-content {
+  flex: 1;
+  background: #111827;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Fake page columns */
+.page-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100%;
+}
+
+.sidebar {
+  background: #0d1117;
+  border-right: 1px solid rgba(255,255,255,0.04);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #64748b;
+}
+.sidebar-item.active {
+  background: rgba(255,255,255,0.06);
+  color: #f8fafc;
+}
+.sidebar-item-icon { font-size: 18px; }
+
+.feed {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feed-card {
+  background: #1a1f2e;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  gap: 0;
+}
+.feed-img {
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+  position: relative;
+  overflow: visible;
+}
+.feed-img.ai-detected { background: linear-gradient(135deg, #1a1520, #2d1b35); }
+.feed-img.real { background: linear-gradient(135deg, #0f1a14, #1a2d1e); }
+.feed-img.unknown { background: linear-gradient(135deg, #14181a, #1a2028); }
+
+/* The hover badge that Faux Spy shows */
+.faux-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+.faux-badge.ai {
+  background: linear-gradient(135deg, rgba(239,68,68,0.95), rgba(220,38,38,0.95));
+  color: white;
+  box-shadow: 0 2px 8px rgba(239,68,68,0.5);
+}
+.faux-badge.real {
+  background: linear-gradient(135deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95));
+  color: white;
+  box-shadow: 0 2px 8px rgba(16,185,129,0.5);
+}
+
+.feed-meta {
+  padding: 16px;
+  flex: 1;
+}
+.feed-user { font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; }
+.feed-text { font-size: 12px; color: #64748b; line-height: 1.5; }
+.feed-stats { display: flex; gap: 16px; margin-top: 12px; font-size: 11px; color: #475569; }
+
+/* Extension popup overlay */
+.popup-overlay {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  z-index: 100;
+}
+
+.popup {
+  width: 360px;
+  background: radial-gradient(circle at 20% 0%, rgba(251,191,36,0.08) 0%, transparent 50%),
+              radial-gradient(circle at 80% 100%, rgba(139,92,246,0.08) 0%, transparent 50%),
+              #0a0e1a;
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(251,191,36,0.1),
+    0 24px 64px rgba(0,0,0,0.7),
+    0 0 48px rgba(251,191,36,0.08);
+}
+
+/* Arrow pointer */
+.popup::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: 38px;
+  width: 16px;
+  height: 16px;
+  background: #0a0e1a;
+  border-left: 1px solid rgba(251,191,36,0.2);
+  border-top: 1px solid rgba(251,191,36,0.2);
+  transform: rotate(45deg);
+}
+
+.p-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.p-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(251,191,36,0.08);
+}
+.p-logo {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 0 18px rgba(251,191,36,0.3);
+}
+.p-title { font-size: 21px; font-weight: 800; font-family: 'Georgia', serif; font-style: italic; background: linear-gradient(135deg,#fbbf24,#d97706); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.p-sub { font-size: 10px; color: #fde68a; font-weight: 500; letter-spacing: 0.5px; }
+
+/* Usage */
+.usage {
+  background: rgba(251,191,36,0.02);
+  border: 1px solid rgba(251,191,36,0.08);
+  border-radius: 10px;
+  padding: 12px;
+}
+.usage-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.usage-lbl { font-size: 11px; color: #fde68a; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.usage-cnt { font-size: 13px; font-weight: 700; color: #fbbf24; }
+.progress { height: 6px; background: rgba(251,191,36,0.1); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; width: 35%; background: linear-gradient(90deg, #fbbf24, #d97706); border-radius: 3px; }
+
+/* Mode selector */
+.modes { display: flex; flex-direction: column; gap: 6px; }
+.mode-hdr { font-size: 11px; font-weight: 700; color: #fde68a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.mode-btn {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  background: rgba(251,191,36,0.02);
+  border: 1.5px solid rgba(251,191,36,0.08);
+  border-radius: 10px;
+  color: #f8fafc;
+}
+.mode-btn.active {
+  background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(217,119,6,0.1));
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.1);
+}
+.mode-icon { font-size: 20px; }
+.mode-name { font-size: 12px; font-weight: 700; }
+.mode-desc { font-size: 10px; color: #64748b; }
+.pro-tag { display: inline-block; padding: 1px 5px; background: linear-gradient(135deg,#fbbf24,#d97706); color: #0a0e1a; border-radius: 3px; font-size: 8px; font-weight: 800; margin-left: 4px; }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.stat { background: rgba(251,191,36,0.03); border: 1px solid rgba(251,191,36,0.08); border-radius: 8px; padding: 10px; text-align: center; }
+.stat-v { font-size: 20px; font-weight: 800; }
+.stat-v.g { background: linear-gradient(135deg,#fbbf24,#d97706); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-v.r { background: linear-gradient(135deg,#ef4444,#dc2626); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-v.gr { background: linear-gradient(135deg,#10b981,#059669); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-l { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+
+.scan-btn { width: 100%; padding: 11px; background: linear-gradient(135deg,#fbbf24,#d97706); color: #0a0e1a; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="browser">
+  <div class="browser-top">
+    <div class="browser-tabs">
+      <div class="tab active">
+        <span class="tab-icon">📸</span>
+        Instagram · Explore
+        <span class="tab-close">×</span>
+      </div>
+      <div class="tab">
+        <span class="tab-icon">🌐</span>
+        New Tab
+        <span class="tab-close">×</span>
+      </div>
+    </div>
+    <div class="browser-nav">
+      <div class="nav-btn">←</div>
+      <div class="nav-btn">→</div>
+      <div class="nav-btn">↺</div>
+      <div class="url-bar">
+        <span class="url-lock">🔒</span>
+        <span class="url-text">instagram.com/explore/</span>
+      </div>
+      <div class="ext-icon">🔍</div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <div class="page-grid">
+      <div class="sidebar">
+        <div class="sidebar-item active"><span class="sidebar-item-icon">🏠</span> Home</div>
+        <div class="sidebar-item"><span class="sidebar-item-icon">🔍</span> Explore</div>
+        <div class="sidebar-item"><span class="sidebar-item-icon">🎬</span> Reels</div>
+        <div class="sidebar-item"><span class="sidebar-item-icon">💬</span> Messages</div>
+        <div class="sidebar-item"><span class="sidebar-item-icon">🔔</span> Notifications</div>
+        <div class="sidebar-item"><span class="sidebar-item-icon">👤</span> Profile</div>
+      </div>
+
+      <div class="feed">
+        <div class="feed-card">
+          <div class="feed-img ai-detected">
+            🌅
+            <div class="faux-badge ai">🤖 AI · 96%</div>
+          </div>
+          <div class="feed-meta">
+            <div class="feed-user">@aiartist_xyz</div>
+            <div class="feed-text">Beautiful sunset at the mountains... feeling grateful for this view 🌄 #nature #photography</div>
+            <div class="feed-stats"><span>❤️ 4,291</span><span>💬 83</span><span>🔁 212</span></div>
+          </div>
+        </div>
+
+        <div class="feed-card">
+          <div class="feed-img real">
+            🤳
+            <div class="faux-badge real">✅ Real · 97%</div>
+          </div>
+          <div class="feed-meta">
+            <div class="feed-user">@travel_real</div>
+            <div class="feed-text">Finally made it to Bali! This place is everything 🌴 #travel #bali #authentic</div>
+            <div class="feed-stats"><span>❤️ 1,847</span><span>💬 42</span><span>🔁 98</span></div>
+          </div>
+        </div>
+
+        <div class="feed-card">
+          <div class="feed-img ai-detected">
+            🏙️
+            <div class="faux-badge ai">🤖 AI · 89%</div>
+          </div>
+          <div class="feed-meta">
+            <div class="feed-user">@cityvibes2024</div>
+            <div class="feed-text">Downtown at midnight, the city never sleeps 🌃 #urban #nightlife #photography</div>
+            <div class="feed-stats"><span>❤️ 2,103</span><span>💬 67</span><span>🔁 154</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extension Popup -->
+    <div class="popup-overlay">
+      <div class="popup">
+        <div class="p-body">
+          <div class="p-header">
+            <div class="p-logo">🔍</div>
+            <div>
+              <div class="p-title">Faux Spy</div>
+              <div class="p-sub">🕵️ Spy on the fakes</div>
+            </div>
+          </div>
+
+          <div class="usage">
+            <div class="usage-row">
+              <span class="usage-lbl">Today's Investigations</span>
+              <span class="usage-cnt">7 / 20</span>
+            </div>
+            <div class="progress"><div class="progress-fill"></div></div>
+          </div>
+
+          <div>
+            <div class="mode-hdr">🎯 Investigation Mode</div>
+            <div class="modes">
+              <div class="mode-btn active">
+                <span class="mode-icon">🕵️</span>
+                <div><div class="mode-name">Detective</div><div class="mode-desc">Hover &amp; investigate</div></div>
+              </div>
+              <div class="mode-btn">
+                <span class="mode-icon">🚀</span>
+                <div><div class="mode-name">Stakeout</div><div class="mode-desc">Scan visible images</div></div>
+              </div>
+              <div class="mode-btn">
+                <span class="mode-icon">🔍</span>
+                <div><div class="mode-name">Deep Dive <span class="pro-tag">PRO</span></div><div class="mode-desc">Every image on page</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="stat-v g">47</div><div class="stat-l">Cases</div></div>
+            <div class="stat"><div class="stat-v r">31</div><div class="stat-l">Fakes</div></div>
+            <div class="stat"><div class="stat-v gr">16</div><div class="stat-l">Real</div></div>
+          </div>
+
+          <button class="scan-btn">🔍 Investigate Page</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

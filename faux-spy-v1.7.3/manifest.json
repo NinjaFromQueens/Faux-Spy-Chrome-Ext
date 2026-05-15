@@ -1,18 +1,29 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.8.0",
+  "version": "1.7.3",
   "description": "Spy on the fakes! Detect AI vs Real photos, plus AI Art and Digital Art (Pro). Works on Instagram, Pinterest, X.",
   "permissions": [
     "activeTab",
     "contextMenus",
     "storage"
   ],
-  "homepage_url": "https://fauxspy.com",
   "host_permissions": [
-    "https://fauxspy.com/*",
-    "https://api.sightengine.com/*",
-    "https://api.thehive.ai/*"
+    "*://*.instagram.com/*",
+    "*://*.cdninstagram.com/*",
+    "*://*.pinterest.com/*",
+    "*://*.pinimg.com/*",
+    "*://*.twitter.com/*",
+    "*://*.x.com/*",
+    "*://*.facebook.com/*",
+    "*://*.fbcdn.net/*",
+    "*://*.reddit.com/*",
+    "*://*.redditmedia.com/*",
+    "*://*.tiktok.com/*",
+    "*://*.tiktokcdn.com/*",
+    "*://*.threads.net/*",
+    "*://*.linkedin.com/*",
+    "*://*.licdn.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -29,7 +40,23 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.instagram.com/*",
+        "*://*.cdninstagram.com/*",
+        "*://*.pinterest.com/*",
+        "*://*.pinimg.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*",
+        "*://*.facebook.com/*",
+        "*://*.fbcdn.net/*",
+        "*://*.reddit.com/*",
+        "*://*.redditmedia.com/*",
+        "*://*.tiktok.com/*",
+        "*://*.tiktokcdn.com/*",
+        "*://*.threads.net/*",
+        "*://*.linkedin.com/*",
+        "*://*.licdn.com/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"]
     }
@@ -37,8 +64,7 @@
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
-    "128": "icons/icon128.png",
-    "512": "icons/icon512.png"
+    "128": "icons/icon128.png"
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
