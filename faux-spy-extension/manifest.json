@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.8.0",
-  "description": "Spy on the fakes! Detect AI vs Real photos, plus AI Art and Digital Art (Pro). Works on Instagram, Pinterest, X.",
+  "version": "1.8.2",
+  "description": "Right-click any photo to find out if it's real or AI-generated. Works on Instagram, Pinterest, X, and anywhere else.",
   "permissions": [
     "activeTab",
     "contextMenus",
@@ -45,7 +45,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["upgrade.html", "upgrade.js"],
+      "resources": ["upgrade.html", "upgrade.js", "history.html", "history.js"],
       "matches": ["https://fauxspy.com/*"]
     }
   ]

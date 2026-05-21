@@ -24,6 +24,7 @@ const DOM = {
   upgradeBtn: null,
   manageBtn: null,
   buyTokensBtn: null,
+  caseFilesBtn: null,
   
   // Text elements
   scanText: null,
@@ -48,6 +49,7 @@ const DOM = {
     this.upgradeBtn = document.getElementById('upgradeBtn');
     this.manageBtn = document.getElementById('manageBtn');
     this.buyTokensBtn = document.getElementById('buyTokensBtn');
+    this.caseFilesBtn = document.getElementById('caseFilesBtn');
 
     this.scanText = document.getElementById('scanText');
     this.scansUsed = document.getElementById('scansUsed');
@@ -92,6 +94,10 @@ const UI = {
     if (license?.isPro) {
       DOM.proCard.hidden = false;
       DOM.usageCard.hidden = true;
+
+      // Hide Pro lock badge on Case Files button for Pro users
+      const lock = document.getElementById('caseFilesLock');
+      if (lock) lock.style.display = 'none';
 
       // Show token balance if token system is active
       if (DOM.tokenBalanceText && license.tokenBalance !== undefined) {
@@ -140,7 +146,7 @@ const UI = {
   // Set scan button state
   setScanButtonState(isScanning) {
     DOM.scanBtn.disabled = isScanning;
-    DOM.scanText.textContent = isScanning ? 'Scanning...' : 'Scan Page';
+    DOM.scanText.textContent = isScanning ? 'Scanning...' : 'Investigate Page';
   }
 };
 
@@ -286,6 +292,16 @@ function handleManage() {
   chrome.tabs.create({ url: 'https://fauxspy.com/account' });
 }
 
+async function handleCaseFiles() {
+  const { license } = await chrome.storage.local.get('license');
+  if (!license?.isPro) {
+    chrome.tabs.create({ url: 'https://fauxspy.com/pro' });
+    UI.showToast('🔒 Case Files is a Pro feature', 3000);
+    return;
+  }
+  chrome.tabs.create({ url: chrome.runtime.getURL('history.html') });
+}
+
 async function handleBuyTokens() {
   const { license } = await chrome.storage.local.get('license');
   const key = license?.key ? `?key=${encodeURIComponent(license.key)}` : '';
@@ -312,6 +328,7 @@ async function init() {
   DOM.upgradeBtn?.addEventListener('click', handleUpgrade);
   DOM.manageBtn?.addEventListener('click', handleManage);
   DOM.buyTokensBtn?.addEventListener('click', handleBuyTokens);
+  DOM.caseFilesBtn?.addEventListener('click', handleCaseFiles);
   
   // v8.2: Scan mode buttons
   document.querySelectorAll('.mode-btn').forEach(btn => {

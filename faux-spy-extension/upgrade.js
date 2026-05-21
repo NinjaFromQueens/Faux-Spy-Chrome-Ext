@@ -74,7 +74,7 @@ async function startCheckout(plan) {
     const { url } = await response.json();
 
     // Validate URL before redirecting (prevent open redirect)
-    if (!url || !url.startsWith('https://')) {
+    if (!url || !url.startsWith('https://fauxspy.com/')) {
       throw new Error('Invalid checkout URL received from server');
     }
 

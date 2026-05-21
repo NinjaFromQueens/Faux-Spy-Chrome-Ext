@@ -54,10 +54,10 @@ async function loadSettings() {
     'sightengineApiUser',
     'sightengineApiSecret',
     'hiveApiKey',
-    'hiveAccessId', 
+    'hiveAccessId',
     'hiveSecretKey',
     'aiSensitivity',
-    'sessionStats'
+    'apiStats'
   ]);
   
   // Load Sightengine credentials
@@ -84,8 +84,8 @@ async function loadSettings() {
     sensitivitySelect.value = 'balanced';
   }
   
-  if (data.sessionStats) {
-    updateStats(data.sessionStats);
+  if (data.apiStats) {
+    updateStats(data.apiStats);
   }
   
   log('✅ Settings loaded');
@@ -456,12 +456,12 @@ function showSightengineStatus(message, type, duration = 3000) {
 }
 
 function updateStats(stats) {
-  const totalEl = document.getElementById('totalScanned');
-  const aiEl = document.getElementById('aiDetected');
-  const humanEl = document.getElementById('humanDetected');
+  const totalEl = document.getElementById('totalScans');
+  const cachedEl = document.getElementById('cachedResults');
+  const apiEl = document.getElementById('apiCalls');
   if (totalEl) totalEl.textContent = stats.total || 0;
-  if (aiEl) aiEl.textContent = stats.ai || 0;
-  if (humanEl) humanEl.textContent = stats.human || 0;
+  if (cachedEl) cachedEl.textContent = stats.cached || 0;
+  if (apiEl) apiEl.textContent = stats.apiCalls || 0;
 }
 
 // Event listeners
@@ -472,6 +472,12 @@ clearSightengineBtn.addEventListener('click', clearSightengineSettings);
 saveBtn.addEventListener('click', saveHiveSettings);
 testBtn.addEventListener('click', testHive);
 clearBtn.addEventListener('click', clearHiveSettings);
+
+document.getElementById('clearCacheBtn')?.addEventListener('click', async () => {
+  if (!confirm('Clear all cached scan results?')) return;
+  await chrome.storage.local.remove('imageCache');
+  showSightengineStatus('🗑️ Cache cleared', 'success');
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', loadSettings);

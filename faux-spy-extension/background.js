@@ -55,7 +55,7 @@ chrome.runtime.onInstalled.addListener(() => {
         license: defaultLicense,
         lastLicenseCheck: Date.now()
       });
-      log('✅ Free tier initialized - 20 scans/day');
+      log('✅ Free tier initialized - 10 scans/day');
     }
   });
 });
@@ -847,10 +847,10 @@ async function cacheResult(imageUrl, result) {
 
 async function incrementStat(statName) {
   try {
-    const { stats } = await chrome.storage.local.get('stats');
-    const currentStats = stats || { total: 0, cached: 0, apiCalls: 0 };
+    const { apiStats } = await chrome.storage.local.get('apiStats');
+    const currentStats = apiStats || { total: 0, cached: 0, apiCalls: 0 };
     currentStats[statName] = (currentStats[statName] || 0) + 1;
-    await chrome.storage.local.set({ stats: currentStats });
+    await chrome.storage.local.set({ apiStats: currentStats });
   } catch (error) {
     console.error('Stats update error:', error);
   }

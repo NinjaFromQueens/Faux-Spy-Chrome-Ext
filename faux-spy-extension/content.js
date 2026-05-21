@@ -741,7 +741,10 @@ async function scanImage(img) {
       
       // v8.1: Update stats and check achievements
       updateStats(result);
-      
+
+      // Save to Case Files (Pro users only)
+      saveToCaseFiles(img, result);
+
       // v8.1: Show animated result panel if enabled
       if (state.showResultPanel && state.scanMode === 'detective') {
         showAnimatedResultPanel(img, result);
@@ -2239,6 +2242,36 @@ async function scanImageWhenReady(img) {
   
   // Now actually scan it
   return scanImage(img);
+}
+
+// ============================================================================
+// CASE FILES — Save scan history for Pro users
+// ============================================================================
+
+async function saveToCaseFiles(img, result) {
+  const { license } = await chrome.storage.local.get('license');
+  if (!license?.isPro) return;
+
+  const confidence = getConfidenceLevel(result.aiProbability || 0, result);
+  const entry = {
+    id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    timestamp: Date.now(),
+    imageUrl: getBestImageUrl(img) || getImageId(img),
+    domain: window.location.hostname,
+    pageTitle: document.title,
+    label: confidence.label,
+    icon: confidence.icon,
+    isAI: isAIGenerated(result.aiProbability, result),
+    confidence: Math.round((result.aiProbability || 0) * 100),
+    method: result.method,
+    category: result.category || 'unknown'
+  };
+
+  const { caseFiles } = await chrome.storage.local.get('caseFiles');
+  const files = caseFiles || [];
+  files.unshift(entry);
+  if (files.length > 200) files.splice(200);
+  await chrome.storage.local.set({ caseFiles: files });
 }
 
 log('🕵️ Faux Spy v1.1 ready - non-invasive overlay system active');
