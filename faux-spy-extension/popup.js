@@ -60,6 +60,9 @@ const DOM = {
     
     this.toast = document.getElementById('toast');
     this.tokenBalanceText = document.getElementById('tokenBalanceText');
+    this.videoDetectCard = document.getElementById('videoDetectCard');
+    this.videoDetectBadge = document.getElementById('videoDetectBadge');
+    this.videoDetectDesc = document.getElementById('videoDetectDesc');
   }
 };
 
@@ -134,8 +137,28 @@ const UI = {
         DOM.progressFill.style.background = 'linear-gradient(90deg, #10b981, #22c55e)';
       }
     }
+
+    // Video detection card state
+    if (DOM.videoDetectCard) {
+      const hasVideo = license?.features?.videoDetection;
+      if (hasVideo) {
+        DOM.videoDetectCard.classList.add('active');
+        if (DOM.videoDetectBadge) {
+          DOM.videoDetectBadge.textContent = 'ACTIVE';
+          DOM.videoDetectBadge.classList.add('badge-active');
+        }
+        if (DOM.videoDetectDesc) DOM.videoDetectDesc.textContent = 'Hover any video to scan it';
+      } else {
+        DOM.videoDetectCard.classList.remove('active');
+        if (DOM.videoDetectBadge) {
+          DOM.videoDetectBadge.textContent = 'PRO+VIDEO';
+          DOM.videoDetectBadge.classList.remove('badge-active');
+        }
+        if (DOM.videoDetectDesc) DOM.videoDetectDesc.textContent = 'Tap to upgrade — $29.99/mo';
+      }
+    }
   },
-  
+
   // Update stats display
   updateStats(stats) {
     DOM.totalScanned.textContent = stats.total || 0;
@@ -329,7 +352,12 @@ async function init() {
   DOM.manageBtn?.addEventListener('click', handleManage);
   DOM.buyTokensBtn?.addEventListener('click', handleBuyTokens);
   DOM.caseFilesBtn?.addEventListener('click', handleCaseFiles);
-  
+  DOM.videoDetectCard?.addEventListener('click', async () => {
+    const { license } = await chrome.storage.local.get('license');
+    if (license?.features?.videoDetection) return; // already active — card is informational
+    chrome.tabs.create({ url: 'https://fauxspy.com/pro' });
+  });
+
   // v8.2: Scan mode buttons
   document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', async () => {

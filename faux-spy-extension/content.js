@@ -1299,6 +1299,21 @@ const scannedVideos = new Set();
 
 async function scanVideo(video) {
   if (!video) return;
+
+  // Check Pro + Video license first — show upgrade prompt regardless of video URL type
+  const { license } = await chrome.storage.local.get('license');
+  if (!license?.features?.videoDetection) {
+    showVideoMessage(video, {
+      icon: '🎬',
+      title: 'Pro + Video Required',
+      body: 'AI video detection requires the Pro + Video plan. Upgrade to analyze videos on any site.',
+      linkUrl: 'https://fauxspy.com/pro',
+      linkLabel: 'Upgrade to Pro + Video →',
+      color: 'blue'
+    });
+    return;
+  }
+
   const src = getVideoSrc(video);
 
   // Blob URL — can't send to Sightengine
@@ -1314,21 +1329,6 @@ async function scanVideo(video) {
 
   if (scannedVideos.has(src)) return;
   scannedVideos.add(src);
-
-  // Check Pro + Video feature before showing loading
-  const { license } = await chrome.storage.local.get('license');
-  if (!license?.features?.videoDetection) {
-    scannedVideos.delete(src);
-    showVideoMessage(video, {
-      icon: '🎬',
-      title: 'Pro + Video Required',
-      body: 'AI video detection requires the Pro + Video plan at $29.99/month.',
-      linkUrl: 'https://fauxspy.com/pro',
-      linkLabel: 'Upgrade →',
-      color: 'blue'
-    });
-    return;
-  }
 
   showVideoLoading(video);
 
