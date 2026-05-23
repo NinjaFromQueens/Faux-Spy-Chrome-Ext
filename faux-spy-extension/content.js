@@ -1176,14 +1176,42 @@ const updateWidgetPosition = throttleRAF(() => {
   }
 });
 
+// Walk up from an img to find a nearby <video> (covers X, YouTube, TikTok poster overlays)
+function findNearbyVideo(img, clientX, clientY) {
+  let el = img.parentElement;
+  for (let i = 0; i < 5 && el; i++) {
+    const v = el.querySelector('video');
+    if (v) return v;
+    el = el.parentElement;
+  }
+  if (clientX && clientY) {
+    const els = document.elementsFromPoint(clientX, clientY);
+    const v = els.find(e => e.tagName === 'VIDEO');
+    if (v) return v;
+  }
+  return null;
+}
+
 document.addEventListener('mouseenter', (e) => {
   const img = e.target;
-  
-  if (img.nodeName !== 'IMG' || !isScannableImage(img)) return;
+  if (img.nodeName !== 'IMG') return;
+
+  // If the img is overlaying a video (poster/thumbnail), route to video widget
+  const nearbyVideo = findNearbyVideo(img, e.clientX, e.clientY);
+  if (nearbyVideo && isScannableVideo(nearbyVideo)) {
+    clearTimeout(state.hoverTimeout);
+    clearTimeout(state.videoHoverTimeout);
+    state.videoHoverTimeout = setTimeout(() => {
+      VideoWidgetPool.show(nearbyVideo);
+    }, CONFIG.hoverDelay);
+    return;
+  }
+
+  if (!isScannableImage(img)) return;
   if (state.scannedImages.has(getBestImageUrl(img) || getImageId(img))) return;
-  
+
   clearTimeout(state.hoverTimeout);
-  
+
   state.hoverTimeout = setTimeout(() => {
     WidgetPool.show(img);
   }, CONFIG.hoverDelay);
