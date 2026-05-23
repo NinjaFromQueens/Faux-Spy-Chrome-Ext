@@ -177,6 +177,9 @@ const state = {
   scannedImages: new Set(),
   visibleImages: new WeakSet(),
   hoverTimeout: null,
+  hideTimeout: null,
+  videoHoverTimeout: null,
+  videoHideTimeout: null,
   currentTarget: null,
   sensitivity: CONFIG.defaultSensitivity, // Will be loaded from settings
   
@@ -1197,6 +1200,308 @@ document.addEventListener('mouseleave', (e) => {
       }
     }, 400); // 400ms — room for slow cursors to reach the button
   }
+}, true);
+
+// ============================================================================
+// VIDEO DETECTION
+// ============================================================================
+
+function isScannableVideo(video) {
+  if (!video || video.tagName !== 'VIDEO') return false;
+  if (video.readyState < 2) return false; // not enough data loaded
+  const rect = video.getBoundingClientRect();
+  if (rect.width < 100 || rect.height < 100) return false;
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  return true;
+}
+
+function getVideoSrc(video) {
+  const src = video.currentSrc || video.src
+    || video.querySelector?.('source')?.src || '';
+  if (!src || src.startsWith('blob:') || src.startsWith('data:')) return null;
+  return src;
+}
+
+const VideoWidgetPool = {
+  widget: null,
+  isVisible: false,
+  currentVideo: null,
+  _pendingVideo: null,
+
+  init() {
+    if (this.widget) return this.widget;
+    this.widget = document.createElement('div');
+    this.widget.className = 'ai-video-widget';
+    this.widget.innerHTML = `
+      <button class="ai-video-widget-btn" type="button" aria-label="Check if AI-generated video">
+        <span>🎬 Analyze Video</span>
+      </button>
+    `;
+
+    const button = this.widget.querySelector('.ai-video-widget-btn');
+    let _scanFired = false;
+    const handleClick = (e) => {
+      if (_scanFired) return;
+      _scanFired = true;
+      setTimeout(() => { _scanFired = false; }, 600);
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const videoToScan = VideoWidgetPool._pendingVideo || VideoWidgetPool.currentVideo;
+      VideoWidgetPool._pendingVideo = null;
+      if (videoToScan) {
+        VideoWidgetPool.hide();
+        scanVideo(videoToScan);
+      }
+    };
+    button.addEventListener('pointerdown', handleClick, true);
+    button.addEventListener('click', handleClick, true);
+    this.widget.addEventListener('mouseenter', () => {
+      clearTimeout(state.videoHideTimeout);
+    }, true);
+    return this.widget;
+  },
+
+  show(video) {
+    if (!this.widget) this.init();
+    this._pendingVideo = video;
+    if (this.currentVideo === video && this.isVisible) return;
+    this.currentVideo = video;
+    this.isVisible = true;
+    this.position(video);
+    if (!this.widget.parentNode) document.body.appendChild(this.widget);
+    this.widget.classList.add('visible');
+  },
+
+  hide() {
+    if (!this.isVisible) return;
+    this.isVisible = false;
+    this.currentVideo = null;
+    if (this.widget) this.widget.classList.remove('visible');
+  },
+
+  position(video) {
+    if (!this.widget || !video) return;
+    requestAnimationFrame(() => {
+      const rect = video.getBoundingClientRect();
+      this.widget.style.cssText = `
+        position: fixed;
+        top: ${rect.top + 8}px;
+        left: ${rect.left + rect.width / 2}px;
+        transform: translateX(-50%);
+        z-index: 2147483647;
+      `;
+    });
+  }
+};
+
+const scannedVideos = new Set();
+
+async function scanVideo(video) {
+  if (!video) return;
+  const src = getVideoSrc(video);
+
+  // Blob URL — can't send to Sightengine
+  if (!src) {
+    showVideoMessage(video, {
+      icon: '⚠️',
+      title: 'Stream Cannot Be Analyzed',
+      body: 'This video uses a protected stream. Try on a page where the video has a direct URL (e.g., .mp4).',
+      color: 'grey'
+    });
+    return;
+  }
+
+  if (scannedVideos.has(src)) return;
+  scannedVideos.add(src);
+
+  // Check Pro + Video feature before showing loading
+  const { license } = await chrome.storage.local.get('license');
+  if (!license?.features?.videoDetection) {
+    scannedVideos.delete(src);
+    showVideoMessage(video, {
+      icon: '🎬',
+      title: 'Pro + Video Required',
+      body: 'AI video detection requires the Pro + Video plan at $29.99/month.',
+      linkUrl: 'https://fauxspy.com/pro',
+      linkLabel: 'Upgrade →',
+      color: 'blue'
+    });
+    return;
+  }
+
+  showVideoLoading(video);
+
+  try {
+    const result = await chrome.runtime.sendMessage({
+      action: 'analyzeVideo',
+      videoData: { src, pageUrl: window.location.href, pageHost: window.location.hostname }
+    });
+
+    hideVideoLoading(video);
+
+    if (!result || result.error) {
+      scannedVideos.delete(src);
+      if (result?.error === 'TOKENS_EXHAUSTED') {
+        showVideoMessage(video, {
+          icon: '🔒',
+          title: 'Tokens Exhausted',
+          body: `Video scans cost 10 tokens. Buy more to continue.`,
+          linkUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
+          linkLabel: 'Buy Tokens →',
+          color: 'orange'
+        });
+      } else if (result?.error === 'DETECTION_TIMEOUT') {
+        showVideoMessage(video, {
+          icon: '⏱️',
+          title: 'Analysis Timed Out',
+          body: 'The video took too long to process. Try a shorter clip.',
+          color: 'grey'
+        });
+      } else {
+        showVideoMessage(video, {
+          icon: '❌',
+          title: 'Analysis Failed',
+          body: result?.message || 'Could not analyze this video.',
+          color: 'grey'
+        });
+      }
+      return;
+    }
+
+    showVideoResultPanel(video, result);
+  } catch (err) {
+    scannedVideos.delete(src);
+    hideVideoLoading(video);
+    console.error('❌ scanVideo error:', err);
+  }
+}
+
+function showVideoLoading(video) {
+  const existing = document.querySelector('.ai-video-loading-overlay');
+  if (existing) existing.remove();
+
+  const rect = video.getBoundingClientRect();
+  const overlay = document.createElement('div');
+  overlay.className = 'ai-video-loading-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: ${rect.top}px;
+    left: ${rect.left}px;
+    width: ${rect.width}px;
+    height: ${rect.height}px;
+    z-index: 2147483646;
+  `;
+  overlay.innerHTML = `
+    <div class="ai-video-loading-inner">
+      <div class="ai-video-spinner"></div>
+      <div class="ai-video-loading-text">Analyzing video…</div>
+      <div class="ai-video-loading-sub">This may take up to 30 seconds</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay._targetVideo = video;
+}
+
+function hideVideoLoading() {
+  document.querySelector('.ai-video-loading-overlay')?.remove();
+}
+
+function showVideoMessage(video, { icon, title, body, linkUrl, linkLabel, color }) {
+  hideVideoLoading();
+  const existing = document.querySelector('.ai-video-message-panel');
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.className = `ai-video-message-panel ai-video-msg-${color || 'grey'}`;
+  panel.innerHTML = `
+    <button class="ai-panel-close" type="button" style="float:right;background:none;border:none;font-size:18px;cursor:pointer;color:inherit;">×</button>
+    <div style="font-size:1.5rem;margin-bottom:6px;">${icon}</div>
+    <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(title)}</div>
+    <div style="font-size:0.85rem;opacity:0.85;">${escapeHtml(body)}</div>
+    ${linkUrl ? `<a href="${linkUrl}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:0.85rem;font-weight:600;color:inherit;">${escapeHtml(linkLabel || 'Learn more')}</a>` : ''}
+  `;
+  panel.querySelector('.ai-panel-close').addEventListener('click', () => panel.remove());
+  positionVideoPanel(panel, video);
+  document.body.appendChild(panel);
+}
+
+function showVideoResultPanel(video, result) {
+  const existing = document.querySelector('.ai-video-result-panel');
+  if (existing) existing.remove();
+
+  const isAI = result.isAIVideo;
+  const scorePercent = Math.round((result.aiScore || 0) * 100);
+  const generatorLine = (isAI && result.topGenerator)
+    ? `<div class="ai-detail-row"><span>Generator:</span><span style="font-weight:700;text-transform:capitalize;">${escapeHtml(result.topGenerator)} — ${Math.round((result.topGeneratorScore || 0) * 100)}% confidence</span></div>`
+    : '';
+  const color = isAI ? 'red' : (result.verdict === 'inconclusive' ? 'yellow' : 'green');
+  const icon  = isAI ? '🚨' : (result.verdict === 'inconclusive' ? '❓' : '✅');
+
+  const panel = document.createElement('div');
+  panel.className = 'ai-video-result-panel';
+  panel.innerHTML = `
+    <div class="ai-panel-header">
+      <h3>🎬 Faux Spy Video Analysis</h3>
+      <button class="ai-panel-close" type="button">×</button>
+    </div>
+    <div class="ai-panel-body">
+      <div class="ai-verdict ai-verdict-${color}" style="margin-bottom:12px;">
+        <span class="ai-verdict-icon">${icon}</span>
+        <span class="ai-verdict-label">${escapeHtml(result.verdictLabel)}</span>
+      </div>
+      <div class="ai-panel-details">
+        <div class="ai-detail-row"><span>AI Score:</span><span>${scorePercent}%</span></div>
+        <div class="ai-detail-row"><span>Frames analyzed:</span><span>${result.framesAnalyzed || '—'}</span></div>
+        ${generatorLine}
+        <div class="ai-detail-row"><span>Tokens used:</span><span>${result.tokensUsed || 10} · Balance: ${result.tokenBalance ?? '—'}</span></div>
+      </div>
+    </div>
+  `;
+
+  panel.querySelector('.ai-panel-close').addEventListener('click', () => panel.remove());
+  positionVideoPanel(panel, video);
+  document.body.appendChild(panel);
+}
+
+function positionVideoPanel(panel, video) {
+  requestAnimationFrame(() => {
+    const rect = video.getBoundingClientRect();
+    const panelW = 300;
+    let left = rect.left + rect.width / 2 - panelW / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
+    let top = rect.bottom + 8;
+    if (top + 200 > window.innerHeight) top = rect.top - 210;
+    panel.style.cssText = `
+      position: fixed;
+      top: ${top}px;
+      left: ${left}px;
+      width: ${panelW}px;
+      z-index: 2147483647;
+    `;
+  });
+}
+
+// Video hover event handlers
+document.addEventListener('mouseenter', (e) => {
+  const video = e.target;
+  if (video.tagName !== 'VIDEO' || !isScannableVideo(video)) return;
+  if (scannedVideos.has(getVideoSrc(video))) return;
+
+  clearTimeout(state.videoHoverTimeout);
+  state.videoHoverTimeout = setTimeout(() => {
+    VideoWidgetPool.show(video);
+  }, CONFIG.hoverDelay);
+}, true);
+
+document.addEventListener('mouseleave', (e) => {
+  if (e.target.tagName !== 'VIDEO') return;
+  clearTimeout(state.videoHoverTimeout);
+  state.videoHideTimeout = setTimeout(() => {
+    if (!VideoWidgetPool.widget?.matches(':hover')) {
+      VideoWidgetPool.hide();
+    }
+  }, 400);
 }, true);
 
 // ============================================================================

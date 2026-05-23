@@ -90,7 +90,74 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     queueAnalysis(request, sendResponse);
     return true; // Keep channel open for async response
   }
+
+  if (request.action === 'analyzeVideo') {
+    analyzeVideo(request, sendResponse);
+    return true; // Keep channel open for async response
+  }
 });
+
+async function analyzeVideo(request, callback) {
+  try {
+    const { license, userId } = await chrome.storage.local.get(['license', 'userId']);
+
+    // Gate: Pro + Video feature required
+    if (!license?.features?.videoDetection) {
+      return callback({ error: 'VIDEO_FEATURE_REQUIRED' });
+    }
+
+    // Optimistic local token pre-check
+    const totalTokens = (license.tokenBalance || 0) + (license.topupBalance || 0);
+    if (totalTokens < 10) {
+      return callback({
+        error: 'TOKENS_EXHAUSTED',
+        tokenBalance: license.tokenBalance || 0,
+        topupBalance: license.topupBalance || 0,
+        required: 10,
+        buyUrl: 'https://fauxspy.com/buy-tokens'
+      });
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    let result;
+    try {
+      const response = await fetch('https://fauxspy.com/api/detect-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: request.videoData.src,
+          userId,
+          licenseKey: license.key
+        }),
+        signal: controller.signal
+      });
+      result = await response.json();
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    // Sync token balance from server response (authoritative)
+    if (typeof result.tokenBalance === 'number') {
+      const stored = await chrome.storage.local.get('license');
+      if (stored.license?.isPro) {
+        stored.license.tokenBalance = result.tokenBalance;
+        stored.license.topupBalance = result.topupBalance ?? 0;
+        await chrome.storage.local.set({ license: stored.license });
+      }
+    }
+
+    callback(result);
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      callback({ error: 'DETECTION_TIMEOUT', message: 'Video analysis timed out. Try a shorter video.' });
+    } else {
+      console.error('❌ analyzeVideo error:', error);
+      callback({ error: 'INTERNAL_ERROR', message: error.message });
+    }
+  }
+}
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
