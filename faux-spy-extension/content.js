@@ -1338,7 +1338,7 @@ async function scanVideo(video) {
       videoData: { src, pageUrl: window.location.href, pageHost: window.location.hostname }
     });
 
-    hideVideoLoading(video);
+    hideVideoLoading();
 
     if (!result || result.error) {
       scannedVideos.delete(src);
@@ -1372,7 +1372,7 @@ async function scanVideo(video) {
     showVideoResultPanel(video, result);
   } catch (err) {
     scannedVideos.delete(src);
-    hideVideoLoading(video);
+    hideVideoLoading();
     console.error('❌ scanVideo error:', err);
   }
 }
