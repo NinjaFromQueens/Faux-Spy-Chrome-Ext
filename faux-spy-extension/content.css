@@ -927,6 +927,43 @@
   pointer-events: auto !important;
 }
 
+.ai-video-widget-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ai-video-widget-close {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 30, 46, 0.85);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  opacity: 0;
+  transition: opacity 150ms ease, background 150ms ease;
+  padding: 0;
+}
+
+.ai-video-widget:hover .ai-video-widget-close {
+  opacity: 1;
+}
+
+.ai-video-widget-close:hover {
+  background: rgba(220, 38, 38, 0.85);
+  border-color: rgba(220, 38, 38, 0.6);
+}
+
 .ai-video-widget-btn {
   display: flex;
   align-items: center;

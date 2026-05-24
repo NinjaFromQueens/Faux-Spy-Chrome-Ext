@@ -35,6 +35,9 @@ const dualKeyFields = document.getElementById('dualKeyFields');
 // Sensitivity
 const sensitivitySelect = document.getElementById('sensitivity');
 
+// Video widget toggle
+const showVideoWidgetCheckbox = document.getElementById('showVideoWidget');
+
 // Toggle Hive auth format
 document.querySelectorAll('input[name="keyFormat"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
@@ -57,6 +60,7 @@ async function loadSettings() {
     'hiveAccessId',
     'hiveSecretKey',
     'aiSensitivity',
+    'showVideoWidget',
     'apiStats'
   ]);
   
@@ -83,11 +87,15 @@ async function loadSettings() {
   } else {
     sensitivitySelect.value = 'balanced';
   }
-  
+
+  if (showVideoWidgetCheckbox) {
+    showVideoWidgetCheckbox.checked = data.showVideoWidget !== false;
+  }
+
   if (data.apiStats) {
     updateStats(data.apiStats);
   }
-  
+
   log('✅ Settings loaded');
 }
 
@@ -659,6 +667,20 @@ function showLicenseStatus2(message, type, duration = 3000) {
   licenseStatus2.textContent = message;
   licenseStatus2.className = 'status show ' + type;
   setTimeout(() => licenseStatus2.classList.remove('show'), duration);
+}
+
+// Video widget toggle
+if (showVideoWidgetCheckbox) {
+  showVideoWidgetCheckbox.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    await chrome.storage.local.set({ showVideoWidget: enabled });
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, { type: 'toggleVideoWidget', enabled });
+      } catch (_) { /* tab may not have content script */ }
+    }
+  });
 }
 
 // Refresh UI on load

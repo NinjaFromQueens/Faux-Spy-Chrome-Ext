@@ -182,6 +182,7 @@ const state = {
   videoHideTimeout: null,
   currentTarget: null,
   sensitivity: CONFIG.defaultSensitivity, // Will be loaded from settings
+  showVideoWidget: true,
   
   // v8.1: New features
   scanMode: 'detective', // detective, quick, deep
@@ -205,13 +206,14 @@ const state = {
 };
 
 // Load sensitivity setting from storage
-chrome.storage.local.get(['aiSensitivity', 'scanMode', 'showResultPanel', 'stats', 'achievements'], (result) => {
+chrome.storage.local.get(['aiSensitivity', 'scanMode', 'showResultPanel', 'showVideoWidget', 'stats', 'achievements'], (result) => {
   if (result.aiSensitivity) {
     state.sensitivity = result.aiSensitivity;
     log(`🎯 AI Sensitivity: ${state.sensitivity} (${(CONFIG.thresholds[state.sensitivity] * 100)}%)`);
   }
   if (result.scanMode) state.scanMode = result.scanMode;
   if (result.showResultPanel !== undefined) state.showResultPanel = result.showResultPanel;
+  if (result.showVideoWidget !== undefined) state.showVideoWidget = result.showVideoWidget;
   if (result.stats) state.stats = { ...state.stats, ...result.stats };
   if (result.achievements) state.achievements = { ...state.achievements, ...result.achievements };
   
@@ -1263,16 +1265,33 @@ const VideoWidgetPool = {
   currentVideo: null,
   _pendingVideo: null,
   _observer: null,
+  dismissedVideos: new Set(),
 
   init() {
     if (this.widget) return this.widget;
     this.widget = document.createElement('div');
     this.widget.className = 'ai-video-widget';
     this.widget.innerHTML = `
-      <button class="ai-video-widget-btn" type="button" aria-label="Check if AI-generated video">
-        <span>🎬 Analyze Video</span>
-      </button>
+      <div class="ai-video-widget-inner">
+        <button class="ai-video-widget-btn" type="button" aria-label="Check if AI-generated video">
+          <span>🎬 Analyze Video</span>
+        </button>
+        <button class="ai-video-widget-close" type="button" aria-label="Dismiss">×</button>
+      </div>
     `;
+
+    const closeBtn = this.widget.querySelector('.ai-video-widget-close');
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const video = this.currentVideo;
+      if (video) {
+        const src = video.src || video.currentSrc || video.dataset.src || '';
+        if (src) this.dismissedVideos.add(src);
+      }
+      this.hide();
+    }, true);
 
     const button = this.widget.querySelector('.ai-video-widget-btn');
     let _scanFired = false;
@@ -1306,9 +1325,14 @@ const VideoWidgetPool = {
   },
 
   show(video) {
+    if (!state.showVideoWidget) return;
     if (!this.widget) this.init();
     this._pendingVideo = video;
     if (this.currentVideo === video && this.isVisible) return;
+
+    // Skip dismissed videos
+    const src = video.src || video.currentSrc || video.dataset.src || '';
+    if (src && this.dismissedVideos.has(src)) return;
     this.currentVideo = video;
     this.isVisible = true;
     this.position(video);
@@ -2361,6 +2385,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'toggleResultPanel') {
     state.showResultPanel = message.enabled;
     chrome.storage.local.set({ showResultPanel: message.enabled });
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (message.type === 'toggleVideoWidget') {
+    state.showVideoWidget = message.enabled;
+    if (!message.enabled) VideoWidgetPool.hide();
+    chrome.storage.local.set({ showVideoWidget: message.enabled });
     sendResponse({ success: true });
     return true;
   }
