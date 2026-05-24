@@ -1250,11 +1250,19 @@ function getVideoSrc(video) {
   return src;
 }
 
+// Pre-cache license so the click handler can check it synchronously
+let cachedLicense = null;
+chrome.storage.local.get('license').then(r => { cachedLicense = r.license || null; });
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.license) cachedLicense = changes.license.newValue || null;
+});
+
 const VideoWidgetPool = {
   widget: null,
   isVisible: false,
   currentVideo: null,
   _pendingVideo: null,
+  _observer: null,
 
   init() {
     if (this.widget) return this.widget;
@@ -1275,6 +1283,13 @@ const VideoWidgetPool = {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
+
+      // Free plan check before anything else — show prompt directly on widget
+      if (!cachedLicense?.features?.videoDetection) {
+        VideoWidgetPool._showUpgradePrompt();
+        return;
+      }
+
       const videoToScan = VideoWidgetPool._pendingVideo || VideoWidgetPool.currentVideo;
       VideoWidgetPool._pendingVideo = null;
       if (videoToScan) {
@@ -1299,13 +1314,72 @@ const VideoWidgetPool = {
     this.position(video);
     if (!this.widget.parentNode) document.body.appendChild(this.widget);
     this.widget.classList.add('visible');
+
+    // Hide when video scrolls out of view
+    if (this._observer) this._observer.disconnect();
+    this._observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) this.hide();
+    }, { threshold: 0.1 });
+    this._observer.observe(video);
+
+    // Hide 1.5s after video starts playing — button isn't useful mid-playback
+    const onPlay = () => {
+      video.removeEventListener('play', onPlay);
+      setTimeout(() => { if (this.currentVideo === video) this.hide(); }, 1500);
+    };
+    video.addEventListener('play', onPlay);
   },
 
   hide() {
     if (!this.isVisible) return;
     this.isVisible = false;
     this.currentVideo = null;
-    if (this.widget) this.widget.classList.remove('visible');
+    if (this.widget) {
+      this.widget.classList.remove('visible');
+      this._clearUpgradePrompt();
+    }
+    if (this._observer) {
+      this._observer.disconnect();
+      this._observer = null;
+    }
+  },
+
+  _clearUpgradePrompt() {
+    if (!this.widget) return;
+    const btn = this.widget.querySelector('.ai-video-widget-btn');
+    const tip = this.widget.querySelector('.ai-video-upgrade-tip');
+    if (tip) tip.remove();
+    if (btn) {
+      btn.style.display = '';
+      btn.disabled = false;
+    }
+  },
+
+  _showUpgradePrompt() {
+    if (!this.widget) return;
+    const btn = this.widget.querySelector('.ai-video-widget-btn');
+    if (btn) btn.style.display = 'none';
+
+    const existing = this.widget.querySelector('.ai-video-upgrade-tip');
+    if (existing) return;
+
+    const tip = document.createElement('div');
+    tip.className = 'ai-video-upgrade-tip';
+    tip.innerHTML = `
+      <span class="ai-upgrade-icon">🔒</span>
+      <span class="ai-upgrade-text">Video analysis requires <strong>Pro + Video</strong></span>
+      <a class="ai-upgrade-link" href="https://fauxspy.com/pro" target="_blank" rel="noopener">Upgrade →</a>
+    `;
+    this.widget.appendChild(tip);
+
+    // Auto-dismiss after 4s or on click-outside
+    const dismiss = (e) => {
+      if (tip.contains(e?.target)) return;
+      this._clearUpgradePrompt();
+      document.removeEventListener('pointerdown', dismiss, true);
+    };
+    setTimeout(() => dismiss(), 4000);
+    setTimeout(() => document.addEventListener('pointerdown', dismiss, true), 100);
   },
 
   position(video) {

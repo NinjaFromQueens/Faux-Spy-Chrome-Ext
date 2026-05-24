@@ -951,6 +951,59 @@
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6);
 }
 
+/* ── Upgrade tip (shown on widget when free user clicks Analyze Video) ── */
+.ai-video-upgrade-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #1e1e2e, #2d2d44);
+  color: #e2e8f0;
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  animation: ai-upgrade-tip-in 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes ai-upgrade-tip-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ai-upgrade-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.ai-upgrade-text {
+  flex: 1;
+  color: #cbd5e1;
+}
+
+.ai-upgrade-text strong {
+  color: #a78bfa;
+}
+
+.ai-upgrade-link {
+  flex-shrink: 0;
+  color: #a78bfa !important;
+  font-weight: 700;
+  text-decoration: none !important;
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 6px;
+  transition: background 150ms ease;
+}
+
+.ai-upgrade-link:hover {
+  background: rgba(167, 139, 250, 0.15) !important;
+}
+
 /* ── Loading overlay ── */
 .ai-video-loading-overlay {
   background: rgba(0, 0, 0, 0.65);
