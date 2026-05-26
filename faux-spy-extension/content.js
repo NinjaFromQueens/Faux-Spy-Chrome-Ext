@@ -1189,7 +1189,16 @@ function findNearbyVideo(img, clientX, clientY) {
   if (clientX && clientY) {
     const els = document.elementsFromPoint(clientX, clientY);
     const v = els.find(e => e.tagName === 'VIDEO');
-    if (v) return v;
+    if (v) {
+      // Only treat this video as "nearby" if it visually overlaps the hovered image.
+      // Without this check, the main YouTube player (<video> covering the left half of
+      // the page) would be returned even when hovering sidebar recommendation thumbnails.
+      const imgRect = img.getBoundingClientRect();
+      const vRect = v.getBoundingClientRect();
+      const overlaps = imgRect.right > vRect.left && imgRect.left < vRect.right &&
+                       imgRect.bottom > vRect.top && imgRect.top < vRect.bottom;
+      if (overlaps) return v;
+    }
   }
   return null;
 }
@@ -2399,6 +2408,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 log('✅ AI Detector v8.1 - All features loaded');
+
+// YouTube SPA navigation — reset widget state when the page changes.
+// YouTube never fires DOMContentLoaded between videos, so stale hover timeouts
+// and _pendingImage references from the previous page would otherwise persist.
+document.addEventListener('yt-navigate-finish', () => {
+  clearTimeout(state.hoverTimeout);
+  clearTimeout(state.videoHoverTimeout);
+  WidgetPool.hide();
+  WidgetPool._pendingImage = null;
+  WidgetPool.currentImage = null;
+  VideoWidgetPool.hide();
+  VideoWidgetPool._pendingVideo = null;
+  VideoWidgetPool.currentVideo = null;
+  log('🔄 YouTube navigation detected — widget state reset');
+});
 
 // ============================================================================
 // v8.4: DRAG FUNCTIONALITY FOR RESULT PANEL
