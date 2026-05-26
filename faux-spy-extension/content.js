@@ -2409,20 +2409,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 log('✅ AI Detector v8.1 - All features loaded');
 
-// YouTube SPA navigation — reset widget state when the page changes.
-// YouTube never fires DOMContentLoaded between videos, so stale hover timeouts
-// and _pendingImage references from the previous page would otherwise persist.
-document.addEventListener('yt-navigate-finish', () => {
+// ── Universal SPA navigation reset ──────────────────────────────────────────
+// YouTube, X/Twitter, Instagram, and Pinterest all use pushState navigation.
+// DOMContentLoaded never re-fires between pages, so stale hover timeouts and
+// _pendingImage references from the previous page must be cleared on URL change.
+
+let _spaLastPath = location.pathname;
+
+function onSPANavigate() {
+  const newPath = location.pathname;
+  if (newPath === _spaLastPath) return; // hash/query-param-only change — ignore
+  _spaLastPath = newPath;
+
   clearTimeout(state.hoverTimeout);
   clearTimeout(state.videoHoverTimeout);
+  clearTimeout(state.hideTimeout);
+  clearTimeout(state.videoHideTimeout);
   WidgetPool.hide();
   WidgetPool._pendingImage = null;
   WidgetPool.currentImage = null;
   VideoWidgetPool.hide();
   VideoWidgetPool._pendingVideo = null;
   VideoWidgetPool.currentVideo = null;
-  log('🔄 YouTube navigation detected — widget state reset');
-});
+  log('🔄 SPA navigation detected — widget state reset');
+}
+
+// popstate fires on browser back/forward on all platforms
+window.addEventListener('popstate', onSPANavigate);
+
+// Interval poll catches pushState navigations on X, Instagram, Pinterest.
+// history.pushState patching is not possible in MV3 isolated worlds.
+setInterval(onSPANavigate, 1000);
+
+// YouTube fires this custom event after page content loads — faster than the poll
+document.addEventListener('yt-navigate-finish', onSPANavigate);
 
 // ============================================================================
 // v8.4: DRAG FUNCTIONALITY FOR RESULT PANEL
