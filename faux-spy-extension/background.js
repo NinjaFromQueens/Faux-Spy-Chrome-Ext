@@ -18,7 +18,7 @@ const MIN_REQUEST_INTERVAL = 500; // 500ms between requests
 let lastRequestTime = 0;
 
 // v1.6: Backend proxy URL - hides Sightengine API key from users
-const BACKEND_URL = 'https://fauxspy.com';
+const BACKEND_URL = 'https://www.fauxspy.com';
 
 // Create context menu
 chrome.runtime.onInstalled.addListener(() => {
@@ -123,7 +123,7 @@ async function analyzeVideo(request, callback) {
 
     let result;
     try {
-      const response = await fetch('https://fauxspy.com/api/detect-video', {
+      const response = await fetch('https://www.fauxspy.com/api/detect-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -763,7 +763,8 @@ async function fetchAndAnalyzeImage(imageUrl) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'openUpgrade') {
     const fallback = chrome.runtime.getURL('upgrade.html');
-    const url = (typeof request.url === 'string' && request.url.startsWith('https://fauxspy.com/'))
+    const url = (typeof request.url === 'string' &&
+                (request.url.startsWith('https://fauxspy.com/') || request.url.startsWith('https://www.fauxspy.com/')))
       ? request.url
       : fallback;
     chrome.tabs.create({ url });
