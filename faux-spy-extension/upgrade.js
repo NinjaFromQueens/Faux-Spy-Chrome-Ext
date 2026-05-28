@@ -74,15 +74,20 @@ async function startCheckout(plan) {
       throw new Error(`Checkout failed: ${error}`);
     }
 
-    const { url } = await response.json();
+    const data = await response.json();
+    const { url, promoApplied } = data;
 
     // Validate URL before redirecting (prevent open redirect)
-    // Stripe returns checkout.stripe.com URLs; fauxspy.com for any local redirects
     if (!url || (!url.startsWith('https://checkout.stripe.com/') && !url.startsWith('https://fauxspy.com/'))) {
       throw new Error('Invalid checkout URL received from server');
     }
 
-    // Redirect to Stripe Checkout
+    // Warn if promo code was expected but didn't apply
+    if (urlPromo && promoApplied === false) {
+      const cont = confirm(`Promo code "${urlPromo.toUpperCase()}" wasn't recognized — you'll be charged the full price.\n\nContinue anyway?`);
+      if (!cont) return;
+    }
+
     log('✅ Redirecting to Stripe Checkout...');
     window.location.href = url;
     
