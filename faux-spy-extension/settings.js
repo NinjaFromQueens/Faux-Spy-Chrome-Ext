@@ -138,6 +138,9 @@ if (activateLicenseBtn) {
         expiresAt: data.expiresAt,
         activatedAt: Date.now(),
         features: data.features,
+        tokenBalance: data.tokenBalance ?? 0,
+        topupBalance: data.topupBalance ?? 0,
+        tokensIncluded: data.tokensIncluded ?? 200,
         limits: {
           scansPerDay: -1,
           caching: true,
