@@ -355,10 +355,19 @@ function getConfidenceLevel(aiProbability, result) {
       case 'real':
         return {
           level: aiProbability < 0.20 ? 'very-low' : 'low',
-          label: result.verdictLabel || 'Real Photo',
+          label: result.verdictLabel || 'No AI Detected',
           icon: '✅',
           color: 'human-very-low',
-          description: 'Genuine photograph'
+          description: 'No AI generation detected'
+        };
+
+      case 'manipulated':
+        return {
+          level: 'manipulated',
+          label: result.verdictLabel || 'Possible Manipulation',
+          icon: '⚠️',
+          color: 'inconclusive',
+          description: 'Real photo but possible face/body manipulation detected'
         };
         
       case 'digital_art':
@@ -419,9 +428,9 @@ function getConfidenceLevel(aiProbability, result) {
   } else if (percentage >= 40) {
     return { level: 'inconclusive', label: 'Inconclusive', icon: '❓', color: 'inconclusive', description: 'Filters or editing may be affecting detection' };
   } else if (percentage >= 20) {
-    return { level: 'low', label: 'Likely Real', icon: '👍', color: 'human-low', description: 'Probably authentic human-made content' };
+    return { level: 'low', label: 'No AI Detected', icon: '✅', color: 'human-low', description: 'No AI generation detected' };
   } else {
-    return { level: 'very-low', label: 'Verified Real', icon: '✅', color: 'human-very-low', description: 'Confident this is genuinely human-made' };
+    return { level: 'very-low', label: 'No AI Detected', icon: '✅', color: 'human-very-low', description: 'No AI generation signals found' };
   }
 }
 
@@ -1178,22 +1187,28 @@ const updateWidgetPosition = throttleRAF(() => {
   }
 });
 
-// Walk up from an img to find a nearby <video> (covers X, YouTube, TikTok poster overlays)
+// Walk up from an img to find a nearby <video> (covers X, YouTube, TikTok, Instagram, Facebook poster overlays)
 function findNearbyVideo(img, clientX, clientY) {
+  const imgRect = img.getBoundingClientRect();
+
+  // Walk up the DOM. Apply AABB overlap check at each level so feed containers
+  // that span multiple posts (Instagram, Facebook) don't match videos from other posts.
   let el = img.parentElement;
-  for (let i = 0; i < 5 && el; i++) {
+  for (let i = 0; i < 10 && el; i++) {
     const v = el.querySelector('video');
-    if (v) return v;
+    if (v) {
+      const vRect = v.getBoundingClientRect();
+      const overlaps = imgRect.right > vRect.left && imgRect.left < vRect.right &&
+                       imgRect.bottom > vRect.top && imgRect.top < vRect.bottom;
+      if (overlaps) return v;
+    }
     el = el.parentElement;
   }
+  // elementsFromPoint fallback — catches videos layered behind the img element
   if (clientX && clientY) {
     const els = document.elementsFromPoint(clientX, clientY);
     const v = els.find(e => e.tagName === 'VIDEO');
     if (v) {
-      // Only treat this video as "nearby" if it visually overlaps the hovered image.
-      // Without this check, the main YouTube player (<video> covering the left half of
-      // the page) would be returned even when hovering sidebar recommendation thumbnails.
-      const imgRect = img.getBoundingClientRect();
       const vRect = v.getBoundingClientRect();
       const overlaps = imgRect.right > vRect.left && imgRect.left < vRect.right &&
                        imgRect.bottom > vRect.top && imgRect.top < vRect.bottom;
@@ -1432,6 +1447,48 @@ const VideoWidgetPool = {
 
 const scannedVideos = new Set();
 
+function captureVideoFrame(video) {
+  try {
+    const w = video.videoWidth || video.offsetWidth;
+    const h = video.videoHeight || video.offsetHeight;
+    if (!w || !h) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.85); // throws SecurityError if CORS-tainted
+  } catch (e) {
+    return null; // CORS taint — caller falls back to error message
+  }
+}
+
+function showBlobStreamError(video) {
+  const host = window.location.hostname;
+  let platform = 'This site';
+  let hint = 'Try hovering the video thumbnail before it plays to scan the preview image instead.';
+
+  if (host.includes('youtube.com')) {
+    platform = 'YouTube';
+    hint = 'YouTube uses encrypted streams. Hover the video thumbnail on the home page or sidebar to scan it as an image.';
+  } else if (host.includes('instagram.com')) {
+    platform = 'Instagram';
+    hint = 'Instagram uses encrypted streams. Hover the post thumbnail before the video plays to scan it.';
+  } else if (host.includes('facebook.com')) {
+    platform = 'Facebook';
+    hint = 'Facebook uses encrypted streams. Hover the video preview image to scan it.';
+  } else if (host.includes('tiktok.com')) {
+    platform = 'TikTok';
+    hint = 'TikTok uses encrypted streams. Try scanning the cover image thumbnail instead.';
+  }
+
+  showVideoMessage(video, {
+    icon: '🔒',
+    title: `${platform} Uses Encrypted Streaming`,
+    body: hint,
+    color: 'grey'
+  });
+}
+
 async function scanVideo(video) {
   if (!video) return;
 
@@ -1451,14 +1508,68 @@ async function scanVideo(video) {
 
   const src = getVideoSrc(video);
 
-  // Blob URL — can't send to Sightengine
+  // Blob URL — try canvas frame capture before giving up
   if (!src) {
-    showVideoMessage(video, {
-      icon: '⚠️',
-      title: 'Stream Cannot Be Analyzed',
-      body: 'This video uses a protected stream. Try on a page where the video has a direct URL (e.g., .mp4).',
-      color: 'grey'
-    });
+    const frameDataUrl = captureVideoFrame(video);
+    if (frameDataUrl) {
+      showVideoLoading(video);
+      try {
+        const result = await chrome.runtime.sendMessage({
+          action: 'analyzeImage',
+          imageData: { src: frameDataUrl, pageUrl: window.location.href, pageHost: window.location.hostname, isVideoFrame: true }
+        });
+        hideVideoLoading();
+        if (result && !result.error) {
+          // Image result uses different field names — translate to video panel format
+          showVideoResultPanel(video, {
+            isAIVideo: result.isAI,
+            aiScore: result.aiProbability,
+            verdict: result.verdict,
+            verdictLabel: result.verdictLabel,
+            framesAnalyzed: 1,
+            tokensUsed: 1,
+            tokenBalance: result.tokenBalance,
+            topupBalance: result.topupBalance,
+            topGenerator: null
+          });
+        } else if (result?.error === 'TOKENS_EXHAUSTED') {
+          showVideoMessage(video, {
+            icon: '🔒',
+            title: 'Tokens Exhausted',
+            body: 'Buy more tokens to continue scanning.',
+            linkUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
+            linkLabel: 'Buy Tokens →',
+            color: 'orange'
+          });
+        } else if (result?.error === 'DAILY_LIMIT_REACHED') {
+          showVideoMessage(video, {
+            icon: '🔒',
+            title: 'Daily Limit Reached',
+            body: 'Upgrade to Pro for unlimited scans.',
+            linkUrl: 'https://fauxspy.com/pro',
+            linkLabel: 'Upgrade to Pro →',
+            color: 'orange'
+          });
+        } else {
+          showVideoMessage(video, {
+            icon: '❌',
+            title: 'Analysis Failed',
+            body: result?.message || 'Could not analyze this video frame.',
+            color: 'grey'
+          });
+        }
+      } catch (err) {
+        hideVideoLoading();
+        showVideoMessage(video, {
+          icon: '❌',
+          title: 'Analysis Failed',
+          body: 'Could not analyze this video frame.',
+          color: 'grey'
+        });
+      }
+    } else {
+      showBlobStreamError(video);
+    }
     return;
   }
 
@@ -2056,8 +2167,12 @@ function showAnimatedResultPanel(img, result) {
           <span class="ai-percent-human">0%</span>
           <span class="ai-percent-ai">0%</span>
         </div>
+        ${(result.category === 'real' || result.category === 'manipulated') ? `
+        <div style="margin-top:8px;padding:6px 10px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:6px;font-size:11px;color:#fbbf24;text-align:center;">
+          ⚠️ May still be manipulated via Photoshop, face swap, or compositing
+        </div>` : ''}
       </div>
-      
+
       <div class="ai-verdict ai-verdict-${confidence.color}">
         <span class="ai-verdict-icon">${confidence.icon}</span>
         <span class="ai-verdict-label">${confidence.label}</span>
@@ -2443,6 +2558,42 @@ setInterval(onSPANavigate, 1000);
 
 // YouTube fires this custom event after page content loads — faster than the poll
 document.addEventListener('yt-navigate-finish', onSPANavigate);
+
+// ============================================================================
+// CAROUSEL NAVIGATION: close result panel when user slides to next/prev image
+// Instagram carousels don't change the pathname so onSPANavigate never fires.
+// ============================================================================
+
+function closeOpenPanels() {
+  document.querySelectorAll('.ai-result-panel-v8').forEach(p => p.remove());
+  WidgetPool.hide();
+  WidgetPool._pendingImage = null;
+  WidgetPool.currentImage = null;
+}
+
+// Click-based detection: carousel arrow buttons inside post/dialog containers
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (!btn.closest('article, [role="dialog"], [role="presentation"]')) return;
+
+  const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+  const isCarouselNav = /next|prev|forward|back/.test(label);
+  // Icon-only SVG buttons with no label inside post containers are carousel arrows
+  const isIconOnly = !label && btn.querySelector('svg') && btn.textContent.trim().length === 0;
+
+  if (isCarouselNav || isIconOnly) {
+    setTimeout(closeOpenPanels, 80);
+  }
+}, true);
+
+// Keyboard-based detection: left/right arrow keys also navigate Instagram carousels
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (!document.querySelector('article, [role="dialog"]')) return;
+  if (!document.querySelector('.ai-result-panel-v8')) return;
+  setTimeout(closeOpenPanels, 80);
+});
 
 // ============================================================================
 // v8.4: DRAG FUNCTIONALITY FOR RESULT PANEL

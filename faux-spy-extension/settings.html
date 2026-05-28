@@ -284,78 +284,11 @@
           <h3>✅ Detection is ready to use</h3>
           <p>Faux Spy comes with built-in AI image detection. Just hover, click, or use Ctrl+Click on any image — no setup required!</p>
           <br>
-          <p><strong>Free tier:</strong> 20 investigations per day</p>
+          <p><strong>Free tier:</strong> 10 investigations per day</p>
           <p><strong>Pro tier:</strong> Unlimited investigations + Deep Dive mode</p>
           <p style="margin-top: 12px;"><a href="https://fauxspy.com/pro" target="_blank" style="color: #fbbf24; text-decoration: underline;">Upgrade to Pro →</a></p>
         </div>
 
-        <details style="margin-top: 16px;">
-          <summary style="cursor: pointer; color: #94a3b8; padding: 8px 0; font-size: 13px;">⚙️ Advanced: Use your own API keys</summary>
-          <div style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-top: 8px;">
-            <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">
-              Power users: bypass our backend by providing your own API keys.
-              Useful if you want unlimited usage without a Pro subscription.
-            </p>
-
-            <div class="form-group">
-              <label for="seApiUser">Sightengine API User (optional)</label>
-              <input 
-                type="text" 
-                id="seApiUser" 
-                placeholder="Optional - get from sightengine.com"
-              >
-            </div>
-
-            <div class="form-group">
-              <label for="seApiSecret">Sightengine API Secret (optional)</label>
-              <input 
-                type="password" 
-                id="seApiSecret" 
-                placeholder="Optional"
-              >
-            </div>
-
-            <div class="checkbox-group">
-              <input type="checkbox" id="showSightengineKeys">
-              <label for="showSightengineKeys" class="checkbox-label">Show secret</label>
-            </div>
-
-            <div class="button-group">
-              <button class="btn-primary" id="saveSightengineBtn">💾 Save</button>
-              <button class="btn-secondary" id="testSightengineBtn">🧪 Test Connection</button>
-              <button class="btn-secondary" id="clearSightengineBtn">🗑️ Clear</button>
-            </div>
-
-            <div class="status" id="sightengineStatus"></div>
-            <div id="sightengineTestResults" style="margin-top: 12px;"></div>
-          </div>
-        </details>
-      </div>
-
-      <!-- Hide legacy Hive section but keep code for compatibility -->
-      <div style="display: none;">
-        <div class="form-group">
-          <label style="display: flex; gap: 16px; cursor: pointer;">
-            <span><input type="radio" name="keyFormat" value="single" checked> Single Token</span>
-            <span><input type="radio" name="keyFormat" value="dual"> Access ID + Secret</span>
-          </label>
-        </div>
-
-        <div id="singleKeyFields">
-          <input type="password" id="apiToken" placeholder="">
-        </div>
-
-        <div id="dualKeyFields">
-          <input type="password" id="accessId" placeholder="">
-          <input type="password" id="secretKey" placeholder="">
-        </div>
-
-        <input type="checkbox" id="showKeys">
-        <button id="saveBtn"></button>
-        <button id="testBtn"></button>
-        <button id="clearBtn"></button>
-        <div id="status"></div>
-        <div id="testResults"></div>
       </div>
 
       <!-- v1.6: License Activation Section -->
@@ -368,7 +301,7 @@
         <div id="freeTierState">
           <div class="info-box">
             <h3>🆓 You're on the Free tier</h3>
-            <p>You get 20 investigations per day. Perfect for casual use.</p>
+            <p>You get 10 investigations per day. Perfect for casual use.</p>
             <br>
             <p><strong>Want more?</strong></p>
             <p>Upgrade to Pro for:</p>
@@ -469,6 +402,7 @@
             <strong>Sensitive:</strong> Catches more AI but may flag some human-made images
           </div>
         </div>
+        <div class="status" id="sensitivityStatus"></div>
       </div>
 
       <!-- Stats Section -->

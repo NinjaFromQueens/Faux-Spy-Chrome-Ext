@@ -249,56 +249,24 @@ async function processAnalysis(request) {
   // Falls back to user's own Sightengine credentials if proxy fails
   // Final fallback: heuristic
   
-  const { 
-    sightengineApiUser, 
-    sightengineApiSecret, 
-    hiveApiKey, 
-    hiveAccessId, 
-    hiveSecretKey,
-    license
-  } = await chrome.storage.local.get([
-    'sightengineApiUser', 'sightengineApiSecret',
-    'hiveApiKey', 'hiveAccessId', 'hiveSecretKey',
-    'license'
-  ]);
-  
-  // STEP 1: Try Faux Spy proxy backend (the new way)
+  const { license } = await chrome.storage.local.get(['license']);
+
+  // STEP 1: Try Faux Spy proxy backend
   log('🎯 [FAUXSPY] Calling backend proxy...');
   const proxyResult = await analyzeWithProxy(imageData, license);
-  
+
   if (proxyResult.method === 'sightengine_api') {
     log('✅ [FAUXSPY] Backend detection succeeded');
     return proxyResult;
   }
-  
+
   // If proxy hit daily limit, return that specific result (don't fall back)
   if (proxyResult.error === 'DAILY_LIMIT_REACHED') {
     log('🚫 [FAUXSPY] Daily limit reached');
     return proxyResult;
   }
-  
-  console.warn('⚠️ [FAUXSPY] Proxy unavailable, trying user credentials...');
-  
-  // STEP 2: Fallback - User's own Sightengine credentials (if they added any)
-  if (sightengineApiUser && sightengineApiSecret) {
-    log('🎯 [SIGHTENGINE] Trying user-provided credentials...');
-    const sightengineResult = await analyzeWithSightengine(imageData);
-    
-    if (sightengineResult.method === 'sightengine_api') {
-      log('✅ [SIGHTENGINE] Detection succeeded with user creds');
-      return sightengineResult;
-    }
-  }
-  
-  // STEP 3: Fallback - User's Hive credentials (legacy)
-  if (hiveApiKey || (hiveAccessId && hiveSecretKey)) {
-    const hiveResult = await analyzeImageData(imageData);
-    if (hiveResult.method === 'hive_api') {
-      return hiveResult;
-    }
-  }
-  
-  // STEP 4: Last resort - heuristic
+
+  // STEP 2: Last resort - heuristic
   log('⚠️ Using heuristic fallback');
   const heuristicResult = await analyzeImageHeuristic(imageData);
   heuristicResult.fallback = true;
@@ -328,11 +296,13 @@ async function analyzeWithProxy(imageData, license) {
   const licenseKey = isPro ? (license?.key || null) : null;
 
   try {
+    const isFrameCapture = imageData.src?.startsWith('data:');
     const response = await fetch(`${BACKEND_URL}/api/detect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        imageUrl: imageData.src,
+        // Video frame captures send base64 data; normal images send a URL
+        ...(isFrameCapture ? { imageData: imageData.src } : { imageUrl: imageData.src }),
         userId,
         isPro,
         // Pass license key so backend can check and deduct tokens
@@ -341,7 +311,8 @@ async function analyzeWithProxy(imageData, license) {
         width: imageData.width || 0,
         height: imageData.height || 0,
         // Light context for backend (URL-based hints)
-        pageHost: imageData.pageHost || ''
+        pageHost: imageData.pageHost || '',
+        ...(imageData.isVideoFrame ? { isVideoFrame: true } : {})
       })
     });
 
@@ -444,415 +415,6 @@ async function analyzeWithProxy(imageData, license) {
       ]
     };
   }
-}
-
-/**
- * Sightengine AI Detection API - v1.3
- * Uses Sightengine's genai model to detect AI-generated images.
- * Free tier: 2,000 calls/month
- * Docs: https://sightengine.com/docs/ai-generated-image-detection
- */
-async function analyzeWithSightengine({ src, width, height, pageUrl, pageHost, pageTitle }) {
-  const { sightengineApiUser, sightengineApiSecret } = await chrome.storage.local.get([
-    'sightengineApiUser', 
-    'sightengineApiSecret'
-  ]);
-  
-  if (!sightengineApiUser || !sightengineApiSecret) {
-    return {
-      isAI: false,
-      aiProbability: 0,
-      confidence: 0,
-      indicators: ['Sightengine not configured'],
-      method: 'no_api',
-      error: 'NO_SIGHTENGINE_KEY'
-    };
-  }
-  
-  // Check cache first
-  const cached = await checkCache('se_' + src);
-  if (cached) {
-    log('📦 [CACHE] Using cached Sightengine result for:', src.substring(0, 60));
-    await incrementStat('cached');
-    return cached;
-  }
-  
-  try {
-    log(`🔍 [SIGHTENGINE] Analyzing: ${src.substring(0, 80)}...`);
-    
-    // Build URL with query params (Sightengine uses GET with query string)
-    const params = new URLSearchParams({
-      url: src,
-      models: 'genai',
-      api_user: sightengineApiUser,
-      api_secret: sightengineApiSecret
-    });
-    
-    const apiUrl = `https://api.sightengine.com/1.0/check.json?${params.toString()}`;
-    
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    log('📦 [SIGHTENGINE] Response:', JSON.stringify(data, null, 2));
-    
-    // Check for API errors
-    if (data.status === 'failure') {
-      console.error('❌ [SIGHTENGINE] API error:', data.error);
-      
-      const errorMessage = data.error?.message || 'Unknown error';
-      const errorType = data.error?.type || 'unknown';
-      
-      return {
-        isAI: false,
-        aiProbability: 0,
-        confidence: 0,
-        indicators: [
-          `Sightengine error: ${errorType}`,
-          errorMessage,
-          'Check your API credentials in HQ Settings'
-        ],
-        method: 'error',
-        error: errorType.toUpperCase(),
-        errorDetail: errorMessage
-      };
-    }
-    
-    // Extract AI detection result
-    // v1.3.2 FIX: Sightengine returns ai_generated nested inside "type"
-    // Real response format:
-    // { "status": "success", "type": { "ai_generated": 0.95 }, "media": {...} }
-    const aiProbability = data.type?.ai_generated ?? data.ai_generated;
-    
-    if (typeof aiProbability !== 'number') {
-      console.error('❌ [SIGHTENGINE] No ai_generated score found in response:', data);
-      throw new Error('AI score not found in Sightengine response — is the genai model enabled in your Sightengine dashboard?');
-    }
-    
-    const isAI = aiProbability > 0.5;
-    
-    log(`
-════════════════════════════════════════════════════════
-🔍 SIGHTENGINE DETECTION RESULT
-════════════════════════════════════════════════════════
-📊 AI Probability: ${(aiProbability * 100).toFixed(2)}%
-📊 Classification: ${isAI ? '🤖 AI-GENERATED' : '👤 HUMAN-MADE'}
-📊 Image URL: ${src.substring(0, 100)}...
-════════════════════════════════════════════════════════
-    `);
-    
-    // Build indicators
-    const indicators = [];
-    if (isAI) {
-      indicators.push(`Sightengine AI confidence: ${(aiProbability * 100).toFixed(1)}%`);
-      if (aiProbability > 0.9) {
-        indicators.push('Extremely likely AI-generated');
-      } else if (aiProbability > 0.75) {
-        indicators.push('Very likely AI-generated');
-      } else {
-        indicators.push('Likely AI-generated');
-      }
-    } else {
-      indicators.push(`Sightengine real confidence: ${((1 - aiProbability) * 100).toFixed(1)}%`);
-      if (aiProbability < 0.1) {
-        indicators.push('Extremely likely human-made');
-      } else if (aiProbability < 0.25) {
-        indicators.push('Very likely human-made');
-      } else {
-        indicators.push('Likely human-made');
-      }
-    }
-    
-    // Add source info if available
-    if (data.media?.id) {
-      indicators.push(`Sightengine ID: ${data.media.id.substring(0, 12)}`);
-    }
-    
-    const result = {
-      isAI: isAI,
-      aiProbability: aiProbability,
-      confidence: aiProbability,
-      indicators: indicators,
-      method: 'sightengine_api',
-      rawScore: aiProbability,
-      rawData: data,
-      timestamp: Date.now()
-    };
-    
-    // Cache the result
-    await cacheResult('se_' + src, result);
-    
-    // Track stats
-    await incrementStat('apiCalls');
-    await incrementStat('total');
-    
-    return result;
-    
-  } catch (error) {
-    console.error('❌ [SIGHTENGINE] Error:', error);
-    return {
-      isAI: false,
-      aiProbability: 0,
-      confidence: 0,
-      indicators: [
-        `Sightengine request failed`,
-        error.message,
-        'Check internet connection or API credentials'
-      ],
-      method: 'error',
-      error: 'REQUEST_FAILED',
-      errorDetail: error.message
-    };
-  }
-}
-
-/**
- * Hive AI Detection API - v1.2 with multi-format auth fallback
- * Tries multiple authentication formats since Hive has different API patterns:
- * 1. Modern: Authorization: Token <key>
- * 2. Legacy: api_token: <accessId>:<secret>
- * 3. Bearer: Authorization: Bearer <key>
- * Whichever works first is used.
- */
-async function analyzeImageData({ src, width, height, pageUrl, pageHost, pageTitle }) {
-  // Get API credentials from storage
-  const { hiveAccessId, hiveSecretKey, apiKeySet, hiveApiKey } = await chrome.storage.local.get(['hiveAccessId', 'hiveSecretKey', 'apiKeySet', 'hiveApiKey']);
-  
-  // v1.2: Support both single API key and access+secret formats
-  const hasCredentials = (hiveApiKey) || (hiveAccessId && hiveSecretKey);
-  
-  if (!apiKeySet || !hasCredentials) {
-    console.error('❌ [HIVE] Missing API credentials');
-    return {
-      isAI: false,
-      aiProbability: 0,
-      confidence: 0,
-      indicators: [
-        'Hive API not configured',
-        'Add your API token in HQ Settings',
-        'Get one free at thehive.ai'
-      ],
-      method: 'no_api',
-      error: 'NO_API_KEY'
-    };
-  }
-  
-  // Check cache first
-  const cached = await checkCache(src);
-  if (cached) {
-    log('📦 [CACHE] Using cached result for:', src.substring(0, 60));
-    await incrementStat('cached');
-    return cached;
-  }
-  
-  // v1.2: Build list of auth strategies to try (in order of likelihood)
-  const authStrategies = [];
-  
-  if (hiveApiKey) {
-    // User provided a single API key - use modern format
-    authStrategies.push({
-      name: 'Token (single key)',
-      headers: {
-        'Authorization': `Token ${hiveApiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
-    authStrategies.push({
-      name: 'Bearer (single key)',
-      headers: {
-        'Authorization': `Bearer ${hiveApiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
-  }
-  
-  if (hiveAccessId && hiveSecretKey) {
-    // Try modern format with just secret as token
-    authStrategies.push({
-      name: 'Token (secret as key)',
-      headers: {
-        'Authorization': `Token ${hiveSecretKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
-    // Try modern format with access ID as token
-    authStrategies.push({
-      name: 'Token (access ID as key)',
-      headers: {
-        'Authorization': `Token ${hiveAccessId}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
-    // Try lowercase authorization with combined credentials
-    authStrategies.push({
-      name: 'authorization: token combined',
-      headers: {
-        'authorization': `token ${hiveAccessId}:${hiveSecretKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
-    // Legacy format (what we had before)
-    authStrategies.push({
-      name: 'Legacy api_token combined',
-      headers: {
-        'api_token': `${hiveAccessId}:${hiveSecretKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
-  }
-  
-  // Try each strategy until one works
-  let lastError = null;
-  let lastErrorText = null;
-  let lastErrorStatus = null;
-  
-  for (const strategy of authStrategies) {
-    try {
-      log(`🔑 [HIVE] Trying auth strategy: ${strategy.name}`);
-      
-      const response = await fetch('https://api.thehive.ai/api/v2/task/sync', {
-        method: 'POST',
-        headers: strategy.headers,
-        body: JSON.stringify({
-          url: src,
-          classes: ['ai_generated']
-        })
-      });
-
-      if (response.ok) {
-        log(`✅ [HIVE] Auth strategy worked: ${strategy.name}`);
-        
-        // Save which strategy worked so we use it first next time
-        await chrome.storage.local.set({ workingHiveAuth: strategy.name });
-        
-        const data = await response.json();
-        return await processHiveResponse(data, src);
-      }
-      
-      // Auth failed, save error and try next
-      lastError = `${strategy.name} failed`;
-      lastErrorStatus = response.status;
-      lastErrorText = await response.text();
-      console.warn(`⚠️ [HIVE] ${strategy.name} returned ${response.status}: ${lastErrorText.substring(0, 200)}`);
-      
-      // If it's a server error (5xx), no point trying other auth methods
-      if (response.status >= 500) {
-        break;
-      }
-      
-    } catch (fetchError) {
-      lastError = fetchError.message;
-      console.warn(`⚠️ [HIVE] ${strategy.name} threw error:`, fetchError.message);
-    }
-  }
-  
-  // All strategies failed - return clear error message
-  console.error('❌ [HIVE] All auth strategies failed. Last error:', lastError);
-  
-  return {
-    isAI: false,
-    aiProbability: 0,
-    confidence: 0,
-    indicators: [
-      `Hive API auth failed (${lastErrorStatus || 'unknown'})`,
-      'Tried 5 different auth formats',
-      lastErrorText ? `Hive said: ${lastErrorText.substring(0, 100)}` : 'Check your API credentials',
-      'Get a Hive token at thehive.ai'
-    ],
-    method: 'error',
-    error: 'AUTH_FAILED',
-    errorDetail: lastErrorText
-  };
-}
-
-/**
- * Process a successful Hive response and extract AI detection result
- */
-async function processHiveResponse(data, src) {
-  log('📦 [HIVE] Full API response:', JSON.stringify(data, null, 2));
-  
-  // Check for errors in response
-  if (data.status && data.status[0] && data.status[0].response && data.status[0].response.status === 'error') {
-    throw new Error(`Hive processing error: ${data.status[0].response.message}`);
-  }
-  
-  // Extract AI detection result
-  const output = data.status?.[0]?.response?.output?.[0];
-  if (!output || !output.classes) {
-    throw new Error('Unexpected Hive response format');
-  }
-  
-  const aiClass = output.classes.find(c => c.class === 'ai_generated');
-  if (!aiClass) {
-    throw new Error('AI detection result not found in response');
-  }
-  
-  const aiProbability = aiClass.score;
-  const isAI = aiProbability > 0.5;
-  
-  log(`
-════════════════════════════════════════════════════════
-🔍 HIVE API DETECTION RESULT (v1.2)
-════════════════════════════════════════════════════════
-📊 AI Probability: ${(aiProbability * 100).toFixed(2)}%
-📊 Classification: ${isAI ? '🤖 AI-GENERATED' : '👤 HUMAN-MADE'}
-📊 Image URL: ${src.substring(0, 100)}...
-════════════════════════════════════════════════════════
-  `);
-  
-  // Create detailed indicators
-  const indicators = [];
-  if (isAI) {
-    indicators.push(`Hive AI confidence: ${(aiProbability * 100).toFixed(1)}%`);
-    if (aiProbability > 0.9) {
-      indicators.push('Extremely likely AI-generated');
-    } else if (aiProbability > 0.75) {
-      indicators.push('Very likely AI-generated');
-    } else {
-      indicators.push('Likely AI-generated');
-    }
-  } else {
-    indicators.push(`Human confidence: ${((1 - aiProbability) * 100).toFixed(1)}%`);
-    if (aiProbability < 0.1) {
-      indicators.push('Extremely likely human-made');
-    } else if (aiProbability < 0.25) {
-      indicators.push('Very likely human-made');
-    } else {
-      indicators.push('Likely human-made');
-    }
-  }
-  
-  const result = {
-    isAI: isAI,
-    aiProbability: aiProbability,
-    confidence: aiProbability,
-    indicators: indicators,
-    method: 'hive_api',
-    rawScore: aiProbability,
-    rawData: output,
-    timestamp: Date.now()
-  };
-  
-  log(`✅ [HIVE] Final result:`, result);
-  
-  // Cache the result
-  await cacheResult(src, result);
-  
-  // Increment stats
-  await incrementStat('apiCalls');
-  await incrementStat('total');
-  
-  return result;
 }
 
 /**

@@ -49,7 +49,9 @@ function switchPlan(plan) {
 
 async function startCheckout(plan) {
   log(`🚀 Starting ${plan} checkout...`);
-  
+
+  // Read promo code from URL (?promo=PRODUCTHUNT) — auto-applies at checkout
+  const urlPromo = new URLSearchParams(window.location.search).get('promo') || '';
 
   try {
     const { userEmail } = await chrome.storage.local.get(['userEmail']);
@@ -62,19 +64,21 @@ async function startCheckout(plan) {
       },
       body: JSON.stringify({
         plan,
-        email: userEmail || undefined
+        email: userEmail || undefined,
+        ...(urlPromo ? { promoCode: urlPromo } : {})
       })
     });
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Checkout failed: ${error}`);
     }
-    
+
     const { url } = await response.json();
 
     // Validate URL before redirecting (prevent open redirect)
-    if (!url || !url.startsWith('https://fauxspy.com/')) {
+    // Stripe returns checkout.stripe.com URLs; fauxspy.com for any local redirects
+    if (!url || (!url.startsWith('https://checkout.stripe.com/') && !url.startsWith('https://fauxspy.com/'))) {
       throw new Error('Invalid checkout URL received from server');
     }
 

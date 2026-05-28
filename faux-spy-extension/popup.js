@@ -428,15 +428,6 @@ async function init() {
     }
   });
   
-  // Check API keys
-  const { hiveAccessId, hiveSecretKey } = await chrome.storage.local.get([
-    'hiveAccessId', 'hiveSecretKey'
-  ]);
-  
-  if (!hiveAccessId || !hiveSecretKey) {
-    UI.showToast('⚙️ Configure API keys in Settings', 5000);
-  }
-  
   log('✅ Popup ready');
 }
 
