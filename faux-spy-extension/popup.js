@@ -308,17 +308,17 @@ function handleSettings() {
 
 function handleUpgrade() {
   // v1.4: Open external Pro page on fauxspy.com
-  chrome.tabs.create({ url: 'https://fauxspy.com/pro' });
+  chrome.tabs.create({ url: 'https://www.fauxspy.com/pro' });
 }
 
 function handleManage() {
-  chrome.tabs.create({ url: 'https://fauxspy.com/account' });
+  chrome.tabs.create({ url: 'https://www.fauxspy.com/account' });
 }
 
 async function handleCaseFiles() {
   const { license } = await chrome.storage.local.get('license');
   if (!license?.isPro) {
-    chrome.tabs.create({ url: 'https://fauxspy.com/pro' });
+    chrome.tabs.create({ url: 'https://www.fauxspy.com/pro' });
     UI.showToast('🔒 Case Files is a Pro feature', 3000);
     return;
   }
@@ -328,7 +328,7 @@ async function handleCaseFiles() {
 async function handleBuyTokens() {
   const { license } = await chrome.storage.local.get('license');
   const key = license?.key ? `?key=${encodeURIComponent(license.key)}` : '';
-  chrome.tabs.create({ url: `https://fauxspy.com/buy-tokens${key}` });
+  chrome.tabs.create({ url: `https://www.fauxspy.com/buy-tokens${key}` });
 }
 
 // ============================================================================
@@ -355,7 +355,7 @@ async function init() {
   DOM.videoDetectCard?.addEventListener('click', async () => {
     const { license } = await chrome.storage.local.get('license');
     if (license?.features?.videoDetection) return; // already active — card is informational
-    chrome.tabs.create({ url: 'https://fauxspy.com/pro' });
+    chrome.tabs.create({ url: 'https://www.fauxspy.com/pro' });
   });
 
   // v8.2: Scan mode buttons
@@ -371,7 +371,7 @@ async function init() {
         
         if (!isPro) {
           // Open Pro upgrade page in new tab
-          chrome.tabs.create({ url: 'https://fauxspy.com/pro' });
+          chrome.tabs.create({ url: 'https://www.fauxspy.com/pro' });
           UI.showToast('🔒 Deep Dive is a Pro feature', 3000);
           return; // Don't switch mode
         }

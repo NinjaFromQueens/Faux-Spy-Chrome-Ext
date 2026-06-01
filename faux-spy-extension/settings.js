@@ -116,7 +116,7 @@ if (activateLicenseBtn) {
     licenseStatus.innerHTML = '';
 
     try {
-      const response = await fetch('https://fauxspy.com/api/validate-license', {
+      const response = await fetch('https://www.fauxspy.com/api/validate-license', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ licenseKey: key.toUpperCase() })

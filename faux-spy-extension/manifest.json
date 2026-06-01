@@ -8,9 +8,10 @@
     "contextMenus",
     "storage"
   ],
-  "homepage_url": "https://fauxspy.com",
+  "homepage_url": "https://www.fauxspy.com",
   "host_permissions": [
     "https://fauxspy.com/*",
+    "https://www.fauxspy.com/*",
     "https://api.sightengine.com/*",
     "https://api.thehive.ai/*"
   ],
@@ -46,7 +47,7 @@
   "web_accessible_resources": [
     {
       "resources": ["upgrade.html", "upgrade.js", "history.html", "history.js"],
-      "matches": ["https://fauxspy.com/*"]
+      "matches": ["https://fauxspy.com/*", "https://www.fauxspy.com/*"]
     }
   ]
 }

@@ -770,7 +770,7 @@ async function scanImage(img) {
       removeLoadingBadge(img);
       showUpgradePrompt(img, {
         message: result.indicators?.[0] || '🔒 Daily limit reached',
-        upgradeUrl: result.upgradeUrl || 'https://fauxspy.com/pro'
+        upgradeUrl: result.upgradeUrl || 'https://www.fauxspy.com/pro'
       });
     } else if (result?.error === 'TOKENS_EXHAUSTED') {
       log('🚫 Token balance exhausted');
@@ -778,7 +778,7 @@ async function scanImage(img) {
       removeLoadingBadge(img);
       showUpgradePrompt(img, {
         message: '🔒 Token balance exhausted',
-        upgradeUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
+        upgradeUrl: result.buyUrl || 'https://www.fauxspy.com/buy-tokens',
         upgradeLabel: 'Buy More Tokens'
       });
     } else {
@@ -810,7 +810,7 @@ async function checkUsageLimit() {
           isPro: true,
           tokensExhausted: true,
           message: '🔒 Token balance exhausted',
-          upgradeUrl: 'https://fauxspy.com/buy-tokens',
+          upgradeUrl: 'https://www.fauxspy.com/buy-tokens',
           upgradeLabel: 'Buy More Tokens'
         };
       }
@@ -971,7 +971,7 @@ function showError(img, message) {
     badge.innerHTML = `
       <span>⚠️</span>
       <span>Error</span>
-      <a class="ai-badge-report" href="https://fauxspy.com/contact" target="_blank" rel="noopener" title="Report this issue to Faux Spy">↗</a>
+      <a class="ai-badge-report" href="https://www.fauxspy.com/contact" target="_blank" rel="noopener" title="Report this issue to Faux Spy">↗</a>
     `;
     wrapper.appendChild(badge);
 
@@ -1416,7 +1416,7 @@ const VideoWidgetPool = {
     tip.innerHTML = `
       <span class="ai-upgrade-icon">🔒</span>
       <span class="ai-upgrade-text">Video analysis requires <strong>Pro + Video</strong></span>
-      <a class="ai-upgrade-link" href="https://fauxspy.com/pro" target="_blank" rel="noopener">Upgrade →</a>
+      <a class="ai-upgrade-link" href="https://www.fauxspy.com/pro" target="_blank" rel="noopener">Upgrade →</a>
     `;
     this.widget.appendChild(tip);
 
@@ -1499,7 +1499,7 @@ async function scanVideo(video) {
       icon: '🎬',
       title: 'Pro + Video Required',
       body: 'AI video detection requires the Pro + Video plan. Upgrade to analyze videos on any site.',
-      linkUrl: 'https://fauxspy.com/pro',
+      linkUrl: 'https://www.fauxspy.com/pro',
       linkLabel: 'Upgrade to Pro + Video →',
       color: 'blue'
     });
@@ -1537,7 +1537,7 @@ async function scanVideo(video) {
             icon: '🔒',
             title: 'Tokens Exhausted',
             body: 'Buy more tokens to continue scanning.',
-            linkUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
+            linkUrl: result.buyUrl || 'https://www.fauxspy.com/buy-tokens',
             linkLabel: 'Buy Tokens →',
             color: 'orange'
           });
@@ -1546,7 +1546,7 @@ async function scanVideo(video) {
             icon: '🔒',
             title: 'Daily Limit Reached',
             body: 'Upgrade to Pro for unlimited scans.',
-            linkUrl: 'https://fauxspy.com/pro',
+            linkUrl: 'https://www.fauxspy.com/pro',
             linkLabel: 'Upgrade to Pro →',
             color: 'orange'
           });
@@ -1593,7 +1593,7 @@ async function scanVideo(video) {
           icon: '🔒',
           title: 'Tokens Exhausted',
           body: `Video scans cost 10 tokens. Buy more to continue.`,
-          linkUrl: result.buyUrl || 'https://fauxspy.com/buy-tokens',
+          linkUrl: result.buyUrl || 'https://www.fauxspy.com/buy-tokens',
           linkLabel: 'Buy Tokens →',
           color: 'orange'
         });
@@ -2212,7 +2212,7 @@ function showAnimatedResultPanel(img, result) {
         <div class="ai-panel-pro-hint">
           <span class="ai-pro-hint-icon">💎</span>
           <span class="ai-pro-hint-text">${result.proHint}</span>
-          <a href="https://fauxspy.com/pro" target="_blank" class="ai-pro-hint-link">Upgrade →</a>
+          <a href="https://www.fauxspy.com/pro" target="_blank" class="ai-pro-hint-link">Upgrade →</a>
         </div>
       ` : ''}
       

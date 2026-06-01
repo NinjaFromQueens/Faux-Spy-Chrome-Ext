@@ -5,7 +5,7 @@ const log = (...a) => { if (DEBUG) console.log(...a); };
 // Handles license activation, validation, and Pro status
 // Connects to fauxspy.com/api/validate-license
 
-const BACKEND_URL = 'https://fauxspy.com';
+const BACKEND_URL = 'https://www.fauxspy.com';
 
 // Re-validate license every 24 hours to catch cancellations
 const LICENSE_RECHECK_INTERVAL = 24 * 60 * 60 * 1000;

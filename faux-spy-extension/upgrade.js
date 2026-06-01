@@ -57,7 +57,7 @@ async function startCheckout(plan) {
     const { userEmail } = await chrome.storage.local.get(['userEmail']);
 
     // Create checkout session via backend
-    const response = await fetch('https://fauxspy.com/api/create-checkout', {
+    const response = await fetch('https://www.fauxspy.com/api/create-checkout', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ async function startCheckout(plan) {
     const { url, promoApplied } = data;
 
     // Validate URL before redirecting (prevent open redirect)
-    if (!url || (!url.startsWith('https://checkout.stripe.com/') && !url.startsWith('https://fauxspy.com/'))) {
+    if (!url || (!url.startsWith('https://checkout.stripe.com/') && !url.startsWith('https://fauxspy.com/') && !url.startsWith('https://www.fauxspy.com/'))) {
       throw new Error('Invalid checkout URL received from server');
     }
 

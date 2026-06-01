@@ -114,7 +114,7 @@ async function analyzeVideo(request, callback) {
         tokenBalance: license.tokenBalance || 0,
         topupBalance: license.topupBalance || 0,
         required: 10,
-        buyUrl: 'https://fauxspy.com/buy-tokens'
+        buyUrl: 'https://www.fauxspy.com/buy-tokens'
       });
     }
 
@@ -341,7 +341,7 @@ async function analyzeWithProxy(imageData, license) {
         ],
         method: 'error',
         error: 'DAILY_LIMIT_REACHED',
-        upgradeUrl: data.upgradeUrl || 'https://fauxspy.com/pro',
+        upgradeUrl: data.upgradeUrl || 'https://www.fauxspy.com/pro',
         dailyLimitInfo: {
           used: data.used,
           limit
@@ -358,7 +358,7 @@ async function analyzeWithProxy(imageData, license) {
         indicators: ['🔒 Token balance exhausted', 'Purchase more tokens to continue'],
         method: 'error',
         error: 'TOKENS_EXHAUSTED',
-        buyUrl: data.buyUrl || 'https://fauxspy.com/buy-tokens',
+        buyUrl: data.buyUrl || 'https://www.fauxspy.com/buy-tokens',
         tokenBalance: 0,
         topupBalance: 0,
       };
