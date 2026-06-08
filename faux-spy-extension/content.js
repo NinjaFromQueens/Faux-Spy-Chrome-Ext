@@ -592,7 +592,7 @@ function getBestImageUrl(img) {
   }
 
   let url = img.src || img.currentSrc || '';
-  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return '';
 
   try {
     // X / Twitter: pbs.twimg.com/media/HASH?format=jpg&name=small → name=large

@@ -296,6 +296,17 @@ async function analyzeWithProxy(imageData, license) {
   const licenseKey = isPro ? (license?.key || null) : null;
 
   try {
+    const src = imageData.src;
+    if (!src || src.startsWith('blob:') ||
+        (!src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://'))) {
+      return {
+        method: 'error',
+        error: 'UNSCANNABLE_URL',
+        verdict: 'error',
+        indicators: ["This image can't be scanned — it has no direct URL"]
+      };
+    }
+
     const isFrameCapture = imageData.src?.startsWith('data:');
     const response = await fetch(`${BACKEND_URL}/api/detect`, {
       method: 'POST',
@@ -367,10 +378,22 @@ async function analyzeWithProxy(imageData, license) {
     // Other error responses
     if (!response.ok || !data.success) {
       console.warn('⚠️ Proxy returned error:', data);
+      let userMessage;
+      if (data.seCode === 1044 || data.error === 'UNSCANNABLE_URL') {
+        userMessage = "This image doesn't have a direct URL — try opening the image in a new tab";
+      } else if (data.seCode === 1201) {
+        userMessage = "Image URL redirected and couldn't be resolved — try from the original source page";
+      } else if (data.error === 'SERVER_NOT_CONFIGURED') {
+        userMessage = 'Detection service is temporarily unavailable';
+      } else if (data.error === 'SERVICE_BUSY') {
+        userMessage = 'Detection service is busy — try again in a moment';
+      } else {
+        userMessage = data.message || 'Detection service unavailable';
+      }
       return {
         method: 'error',
         error: data.error || 'PROXY_ERROR',
-        indicators: [data.message || 'Detection service unavailable']
+        indicators: [userMessage]
       };
     }
 
