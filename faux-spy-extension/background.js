@@ -1,3 +1,5 @@
+importScripts('sentry-reporter.js');
+
 // Background service worker
 
 const DEBUG = false;
@@ -390,6 +392,11 @@ async function analyzeWithProxy(imageData, license) {
       } else {
         userMessage = data.message || 'Detection service unavailable';
       }
+      sentryCapture(`Scan failed: ${data.error || 'PROXY_ERROR'}`, {
+        tags: { error_type: data.error || 'PROXY_ERROR', se_code: String(data.seCode || ''), platform: imageData.pageHost || '' },
+        extra: { message: data.message, seCode: data.seCode },
+        userId
+      });
       return {
         method: 'error',
         error: data.error || 'PROXY_ERROR',
@@ -426,6 +433,11 @@ async function analyzeWithProxy(imageData, license) {
     
   } catch (error) {
     console.error('❌ Proxy call failed:', error);
+    sentryCapture(`Network error: ${error.message}`, {
+      tags: { error_type: 'NETWORK_ERROR', platform: imageData.pageHost || '' },
+      extra: { errorDetail: error.message },
+      userId
+    });
     const platform = getPlatformDisplayName(imageData.pageHost || '');
     return {
       method: 'error',

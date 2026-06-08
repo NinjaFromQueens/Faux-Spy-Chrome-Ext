@@ -13,7 +13,8 @@
     "https://fauxspy.com/*",
     "https://www.fauxspy.com/*",
     "https://api.sightengine.com/*",
-    "https://api.thehive.ai/*"
+    "https://api.thehive.ai/*",
+    "https://o4511531878252544.ingest.us.sentry.io/*"
   ],
   "action": {
     "default_popup": "popup.html",
