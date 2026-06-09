@@ -462,6 +462,56 @@
   font-weight: 600;
 }
 
+/* SIGNAL + TRACE engine breakdown */
+.ai-result-panel-v8 .ai-engines-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.ai-result-panel-v8 .ai-engine-block {
+  flex: 1;
+  text-align: center;
+  padding: 10px 8px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-result-panel-v8 .ai-engine-signal {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.ai-result-panel-v8 .ai-engine-trace {
+  background: rgba(20, 184, 166, 0.10);
+  border-color: rgba(20, 184, 166, 0.25);
+}
+
+.ai-result-panel-v8 .ai-engine-name {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 4px;
+}
+
+.ai-result-panel-v8 .ai-engine-signal .ai-engine-name { color: #818cf8; }
+.ai-result-panel-v8 .ai-engine-trace .ai-engine-name  { color: #2dd4bf; }
+
+.ai-result-panel-v8 .ai-engine-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.ai-result-panel-v8 .ai-engine-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
 /* Actions */
 .ai-result-panel-v8 .ai-panel-actions {
   display: flex;

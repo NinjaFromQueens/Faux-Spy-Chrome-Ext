@@ -329,10 +329,18 @@ function showAchievementToast(achievement) {
 // v1.3: Get human-readable method label
 function getMethodLabel(method) {
   switch (method) {
+    case 'signal_trace':
+      return '✓ SIGNAL + TRACE';
+    case 'signal_only':
+      return '✓ SIGNAL (TRACE unavailable)';
+    case 'trace_full':
+      return '✓ TRACE (SIGNAL unavailable)';
     case 'sightengine_api':
-      return '✓ Sightengine AI';
+    case 'sightengine_api_pro':
+      return '✓ TRACE';
     case 'hive_api':
-      return '✓ Hive AI';
+    case 'hive_api_pro':
+      return '✓ SIGNAL';
     case 'heuristic':
       return '⚠ Heuristic Fallback';
     case 'cached':
@@ -2183,12 +2191,25 @@ function showAnimatedResultPanel(img, result) {
           <span>Confidence:</span>
           <span>${confidence.description}</span>
         </div>
+        ${result.signal || result.trace ? `
+        <div class="ai-engines-row">
+          ${result.signal ? `
+          <div class="ai-engine-block ai-engine-signal">
+            <div class="ai-engine-name">SIGNAL</div>
+            <div class="ai-engine-value">${result.signal.status === 'ok' ? Math.round((result.signal.score || 0) * 100) + '%' : result.signal.status === 'fallback' ? 'fallback' : '—'}</div>
+            <div class="ai-engine-label">AI score</div>
+          </div>` : ''}
+          ${result.trace && result.trace.status === 'ok' ? `
+          <div class="ai-engine-block ai-engine-trace">
+            <div class="ai-engine-name">TRACE</div>
+            <div class="ai-engine-value">${result.trace.photoScore !== undefined ? (result.trace.illustrationScore >= 0.5 ? 'Art' : 'Photo') : '—'}</div>
+            <div class="ai-engine-label">type${result.trace.deepfakeScore > 0.5 ? ' · ⚠️ manip' : ''}</div>
+          </div>` : ''}
+        </div>` : `
         <div class="ai-detail-row">
           <span>Method:</span>
-          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : 'api'}">
-            ${getMethodLabel(result.method)}
-          </span>
-        </div>
+          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : 'api'}">${getMethodLabel(result.method)}</span>
+        </div>`}
         <div class="ai-detail-row">
           <span>Sensitivity:</span>
           <span>${state.sensitivity}</span>
@@ -2196,7 +2217,7 @@ function showAnimatedResultPanel(img, result) {
         ${result.method === 'heuristic' ? `
           <div class="ai-warning">
             ⚠️ Heuristic-only detection (limited accuracy).
-            Configure Sightengine in HQ Settings for accurate results.
+            Configure API credentials in HQ Settings for accurate results.
           </div>
         ` : ''}
       </div>
