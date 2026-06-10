@@ -906,6 +906,36 @@
   text-decoration: underline !important;
 }
 
+/* Metadata Signal Analysis */
+.ai-meta-signals {
+  margin: 0 16px 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.ai-meta-signals-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 6px;
+}
+
+.ai-meta-signal {
+  font-size: 11.5px;
+  padding: 2px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.ai-meta-signal-flag { color: #fca5a5; }
+.ai-meta-signal-warn { color: #fde68a; }
+.ai-meta-signal-info { color: rgba(255, 255, 255, 0.5); }
+
 /* C2PA Content Credentials badge */
 .ai-badge-c2pa-verified {
   background: linear-gradient(135deg, #0ea5e9, #0284c7) !important;

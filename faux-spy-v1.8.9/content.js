@@ -2234,6 +2234,18 @@ function showAnimatedResultPanel(img, result) {
         </div>
       ` : ''}
 
+      ${result.metadata_signals && result.metadata_signals.length > 0 ? `
+        <div class="ai-meta-signals">
+          <div class="ai-meta-signals-title">Metadata Analysis</div>
+          ${result.metadata_signals.map(sig => `
+            <div class="ai-meta-signal ai-meta-signal-${escapeHtml(sig.severity)}">
+              ${sig.severity === 'flag' ? '🚩' : sig.severity === 'warn' ? '⚠️' : 'ℹ️'}
+              ${escapeHtml(sig.label)}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
       ${result.method === 'c2pa_verified' && result.c2pa ? `
         <div class="ai-c2pa-badge">
           <div class="ai-c2pa-header">🏛️ Content Credentials Verified</div>
