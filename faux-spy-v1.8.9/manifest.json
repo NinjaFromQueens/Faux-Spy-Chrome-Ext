@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Faux Spy - AI Image Detector",
+  "version": "1.9.0",
+  "description": "Right-click any photo to find out if it's real or AI-generated. Works on Instagram, Pinterest, X, and anywhere else.",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage"
+  ],
+  "homepage_url": "https://www.fauxspy.com",
+  "host_permissions": [
+    "https://fauxspy.com/*",
+    "https://www.fauxspy.com/*",
+    "https://api.sightengine.com/*",
+    "https://api.thehive.ai/*",
+    "https://o4511531878252544.ingest.us.sentry.io/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Faux Spy - Detect AI Images",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "settings.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png",
+    "512": "icons/icon512.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["upgrade.html", "upgrade.js", "history.html", "history.js"],
+      "matches": ["https://fauxspy.com/*", "https://www.fauxspy.com/*"]
+    }
+  ]
+}

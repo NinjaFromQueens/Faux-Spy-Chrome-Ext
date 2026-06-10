@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Detector Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-description {
+      color: #666;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+      font-family: monospace;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .input-hint {
+      font-size: 12px;
+      color: #999;
+      margin-top: 6px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    button {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #666;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-top: 16px;
+      display: none;
+    }
+
+    .status.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+      display: block;
+    }
+
+    .status.error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+      display: block;
+    }
+
+    .info-box {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .info-box h3 {
+      color: #1976d2;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .info-box p {
+      color: #555;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .info-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    .info-box a {
+      color: #1976d2;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .info-box a:hover {
+      text-decoration: underline;
+    }
+
+    .stats {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .warning {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .warning h3 {
+      color: #f57c00;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .warning p {
+      color: #555;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checkbox-label {
+      font-size: 14px;
+      color: #555;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🕵️ Faux Spy HQ Settings</h1>
+      <p>Configure your detective tools</p>
+    </div>
+
+    <div class="content">
+      <!-- v1.5: Detection is now built-in via Faux Spy backend -->
+      <div class="section">
+        <div class="section-title">
+          🎯 AI Detection
+        </div>
+
+        <div class="info-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.05)); border-color: #10b981;">
+          <h3>✅ Detection is ready to use</h3>
+          <p>Faux Spy comes with built-in AI image detection. Just hover, click, or use Ctrl+Click on any image — no setup required!</p>
+          <br>
+          <p><strong>Free tier:</strong> 10 investigations per day</p>
+          <p><strong>Pro tier:</strong> Unlimited investigations + Deep Dive mode</p>
+          <p style="margin-top: 12px;"><a href="https://www.fauxspy.com/pro" target="_blank" style="color: #fbbf24; text-decoration: underline;">Upgrade to Pro →</a></p>
+        </div>
+
+      </div>
+
+      <!-- v1.6: License Activation Section -->
+      <div class="section" id="licenseSection">
+        <div class="section-title">
+          🎫 Pro License
+        </div>
+
+        <!-- FREE TIER STATE (default) -->
+        <div id="freeTierState">
+          <div class="info-box">
+            <h3>🆓 You're on the Free tier</h3>
+            <p>You get 10 investigations per day. Perfect for casual use.</p>
+            <br>
+            <p><strong>Want more?</strong></p>
+            <p>Upgrade to Pro for:</p>
+            <p>• Unlimited investigations</p>
+            <p>• Deep Dive mode (scan all images on a page)</p>
+            <p>• Detective Case Files</p>
+            <p>• Priority support</p>
+            <br>
+            <p><a href="https://www.fauxspy.com/pro" target="_blank" style="color: #fbbf24; text-decoration: underline; font-weight: 600;">Get Pro →</a></p>
+          </div>
+
+          <div style="margin-top: 24px;">
+            <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">Already have a license key?</p>
+            
+            <div class="form-group">
+              <label for="licenseKeyInput">License Key</label>
+              <input 
+                type="text" 
+                id="licenseKeyInput" 
+                placeholder="FAUX-XXXX-XXXX-XXXX-XXXX"
+                style="font-family: 'Courier New', monospace; letter-spacing: 1px; text-transform: uppercase;"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <div class="input-hint">From the email you received after subscribing</div>
+            </div>
+
+            <div class="button-group">
+              <button class="btn-primary" id="activateLicenseBtn">🔓 Activate Pro</button>
+            </div>
+
+            <div class="status" id="licenseStatus"></div>
+          </div>
+        </div>
+
+        <!-- PRO TIER STATE (shown when license active) -->
+        <div id="proTierState" style="display: none;">
+          <div class="info-box" style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(217, 119, 6, 0.05)); border-color: #fbbf24;">
+            <h3>✨ Pro Active</h3>
+            <p><strong>Plan:</strong> <span id="proPlan">—</span></p>
+            <p><strong>Email:</strong> <span id="proEmail">—</span></p>
+            <p><strong>Renews:</strong> <span id="proExpires">—</span></p>
+            <p><strong>License:</strong> <span id="proLicenseDisplay" style="font-family: monospace; font-size: 12px;">—</span></p>
+            <br>
+            <p>You have access to all Pro features:</p>
+            <p>✅ Unlimited investigations</p>
+            <p>✅ Deep Dive mode</p>
+            <p>✅ Detective Case Files</p>
+            <p>✅ Priority detection</p>
+          </div>
+
+          <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="https://www.fauxspy.com/account" target="_blank" class="btn-secondary" style="text-decoration: none; display: inline-block;">⚙️ Manage Subscription</a>
+            <button class="btn-secondary" id="deactivateLicenseBtn">🔓 Deactivate License</button>
+          </div>
+          
+          <div class="status" id="licenseStatus2"></div>
+        </div>
+      </div>
+
+      <!-- Video Analysis Button Section -->
+      <div class="section">
+        <div class="section-title">
+          🎬 Video Analysis Button
+        </div>
+        <div class="section-description">
+          Controls whether the "Analyze Video" button appears when you hover over videos.
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="showVideoWidget" checked style="width:18px;height:18px;cursor:pointer;">
+            Show "Analyze Video" button on videos
+          </label>
+          <div class="input-hint">When off, the button won't appear on any video.</div>
+        </div>
+      </div>
+
+      <!-- AI Detection Sensitivity Section -->
+      <div class="section">
+        <div class="section-title">
+          🎯 AI Detection Sensitivity
+        </div>
+        
+        <div class="section-description">
+          Adjust how strict the AI detection should be. Lower thresholds catch more AI-generated images but may have some false positives.
+        </div>
+
+        <div class="form-group">
+          <label for="sensitivity">Detection Threshold</label>
+          <select id="sensitivity" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+            <option value="strict">🔴 Strict (60%) - Only flag obvious AI</option>
+            <option value="balanced" selected>🟡 Balanced (40%) - Recommended</option>
+            <option value="sensitive">🟢 Sensitive (30%) - Catch more AI</option>
+          </select>
+          <div class="input-hint">
+            <strong>Strict:</strong> Best for avoiding false positives<br>
+            <strong>Balanced:</strong> Good balance of accuracy (default)<br>
+            <strong>Sensitive:</strong> Catches more AI but may flag some human-made images
+          </div>
+        </div>
+        <div class="status" id="sensitivityStatus"></div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="section">
+        <div class="section-title">
+          📊 Usage Statistics
+        </div>
+        <div class="stats">
+          <div class="stat-item">
+            <div class="stat-value" id="totalScans">0</div>
+            <div class="stat-label">Total Scans</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="cachedResults">0</div>
+            <div class="stat-label">Cached</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="apiCalls">0</div>
+            <div class="stat-label">API Calls</div>
+          </div>
+        </div>
+        <div class="input-hint" style="text-align: center; margin-top: 12px;">
+          Cached results save ~$0.002 per image
+        </div>
+      </div>
+
+      <!-- Cache Section -->
+      <div class="section">
+        <div class="section-title">
+          🗂️ Cache Management
+        </div>
+        <div class="section-description">
+          Cached results are stored locally to reduce API costs. Clear cache to force re-analysis of all images.
+        </div>
+        <button class="btn-secondary" id="clearCacheBtn" style="width: 100%;">
+          🗑️ Clear Cache
+        </button>
+      </div>
+
+      <!-- Warning -->
+      <div class="warning">
+        <h3>🔒 Privacy Note</h3>
+        <p>Faux Spy doesn't track your browsing or store images. Image URLs are sent only when you actively investigate. We use anonymous user IDs — no email or login required.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
