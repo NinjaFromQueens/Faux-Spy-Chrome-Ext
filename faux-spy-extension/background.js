@@ -92,7 +92,7 @@ async function runLocalInference(url) {
     const scores = output[session.outputNames[0]].data;
     let aiScore;
     if (scores.length === 2) {
-      const expR = Math.exp(scores[0]), expA = Math.exp(scores[1]);
+      const expA = Math.exp(scores[0]), expR = Math.exp(scores[1]);
       aiScore = expA / (expR + expA);
     } else {
       aiScore = 1 / (1 + Math.exp(-scores[0]));
