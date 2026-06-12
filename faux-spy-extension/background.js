@@ -65,7 +65,8 @@ async function fetchImagePixels(url) {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(bitmap, 0, 0);
     return ctx.getImageData(0, 0, 224, 224).data;
-  } catch {
+  } catch (e) {
+    log('⚡ [ONNX] Pixel fetch failed:', e.message);
     return null;
   }
 }
@@ -110,9 +111,10 @@ function buildLocalResult(aiScore, isAI) {
   return {
     success: true,
     isAI,
-    aiProbability: isAI ? aiScore : 1 - aiScore,
+    aiProbability: aiScore,
     confidence: Math.abs(aiScore - 0.5) * 2,
     verdict: isAI ? 'ai_photo' : 'real',
+    category: isAI ? 'ai_photo' : 'real',
     verdictLabel: isAI ? 'AI Detected' : 'No AI Detected',
     method: 'local_onnx',
     indicators: [

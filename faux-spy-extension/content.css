@@ -621,6 +621,11 @@
   font-weight: 700;
 }
 
+.ai-result-panel-v8 .ai-method-onnx {
+  color: #a78bfa !important;
+  font-weight: 700;
+}
+
 /* Warning notice */
 .ai-result-panel-v8 .ai-warning {
   margin-top: 12px;

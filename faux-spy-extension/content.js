@@ -2210,7 +2210,7 @@ function showAnimatedResultPanel(img, result) {
         </div>` : `
         <div class="ai-detail-row">
           <span>Method:</span>
-          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : 'api'}">${getMethodLabel(result.method)}</span>
+          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : result.method === 'local_onnx' ? 'onnx' : 'api'}">${getMethodLabel(result.method)}</span>
         </div>`}
         <div class="ai-detail-row">
           <span>Sensitivity:</span>
