@@ -5,6 +5,125 @@ importScripts('sentry-reporter.js');
 const DEBUG = false;
 const log = (...a) => { if (DEBUG) console.log(...a); };
 
+// ============================================================================
+// Local ONNX Pre-filter
+// ============================================================================
+
+try {
+  importScripts('ort.min.js');
+} catch (e) {
+  console.warn('⚠️ [ONNX] Runtime failed to load:', e.message);
+}
+
+const ONNX_MODEL_URL = 'https://www.fauxspy.com/static/ai-detector.onnx';
+const ONNX_CACHE_NAME = 'fauxspy-onnx-v1';
+const ONNX_THRESHOLDS = { AI_CONFIDENT: 0.88, REAL_CONFIDENT: 0.12 };
+const IMAGENET_MEAN = [0.485, 0.456, 0.406];
+const IMAGENET_STD = [0.229, 0.224, 0.225];
+
+let _onnxSession = null;
+let _onnxInitPromise = null;
+
+async function initOnnxSession() {
+  if (_onnxSession) return _onnxSession;
+  if (_onnxInitPromise) return _onnxInitPromise;
+  _onnxInitPromise = (async () => {
+    try {
+      if (typeof ort === 'undefined') return null;
+      ort.env.wasm.wasmPaths = chrome.runtime.getURL('');
+      const cache = await caches.open(ONNX_CACHE_NAME);
+      let modelResp = await cache.match(ONNX_MODEL_URL);
+      if (!modelResp) {
+        modelResp = await fetch(ONNX_MODEL_URL);
+        if (!modelResp.ok) throw new Error(`Model fetch ${modelResp.status}`);
+        await cache.put(ONNX_MODEL_URL, modelResp.clone());
+        log('✅ [ONNX] Model downloaded and cached');
+      }
+      const modelBuf = await modelResp.arrayBuffer();
+      _onnxSession = await ort.InferenceSession.create(modelBuf, { executionProviders: ['wasm'] });
+      log('✅ [ONNX] Session ready');
+      return _onnxSession;
+    } catch (err) {
+      console.warn('⚠️ [ONNX] Init failed:', err.message);
+      _onnxInitPromise = null;
+      return null;
+    }
+  })();
+  return _onnxInitPromise;
+}
+
+async function fetchImagePixels(url) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const resp = await fetch(url, { mode: 'cors', credentials: 'omit', signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    const bitmap = await createImageBitmap(blob, { resizeWidth: 224, resizeHeight: 224, resizeQuality: 'medium' });
+    const canvas = new OffscreenCanvas(224, 224);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+    return ctx.getImageData(0, 0, 224, 224).data;
+  } catch {
+    return null;
+  }
+}
+
+function preprocessPixels(pixels) {
+  const float32 = new Float32Array(3 * 224 * 224);
+  for (let i = 0; i < 224 * 224; i++) {
+    float32[i]                 = (pixels[i * 4]     / 255 - IMAGENET_MEAN[0]) / IMAGENET_STD[0];
+    float32[224 * 224 + i]     = (pixels[i * 4 + 1] / 255 - IMAGENET_MEAN[1]) / IMAGENET_STD[1];
+    float32[2 * 224 * 224 + i] = (pixels[i * 4 + 2] / 255 - IMAGENET_MEAN[2]) / IMAGENET_STD[2];
+  }
+  return float32;
+}
+
+async function runLocalInference(url) {
+  try {
+    const session = await initOnnxSession();
+    if (!session) return null;
+    const pixels = await fetchImagePixels(url);
+    if (!pixels) return null;
+    const tensor = new ort.Tensor('float32', preprocessPixels(pixels), [1, 3, 224, 224]);
+    const feeds = { [session.inputNames[0]]: tensor };
+    const output = await session.run(feeds);
+    const scores = output[session.outputNames[0]].data;
+    let aiScore;
+    if (scores.length === 2) {
+      const expR = Math.exp(scores[0]), expA = Math.exp(scores[1]);
+      aiScore = expA / (expR + expA);
+    } else {
+      aiScore = 1 / (1 + Math.exp(-scores[0]));
+    }
+    log(`⚡ [ONNX] ai=${(aiScore * 100).toFixed(1)}%`);
+    return { aiScore };
+  } catch (err) {
+    console.warn('⚠️ [ONNX] Inference error:', err.message);
+    return null;
+  }
+}
+
+function buildLocalResult(aiScore, isAI) {
+  const pct = Math.round(aiScore * 100);
+  return {
+    success: true,
+    isAI,
+    aiProbability: isAI ? aiScore : 1 - aiScore,
+    confidence: Math.abs(aiScore - 0.5) * 2,
+    verdict: isAI ? 'ai_photo' : 'real',
+    verdictLabel: isAI ? 'AI Detected' : 'No AI Detected',
+    method: 'local_onnx',
+    indicators: [
+      isAI ? `Local model: ${pct}% AI probability` : `Local model: ${100 - pct}% real probability`,
+      '⚡ Fast local scan — no API call'
+    ],
+    localOnly: true,
+    timestamp: Date.now()
+  };
+}
+
 // v1.6.1: Import license management module
 try {
   importScripts('license.js');
@@ -252,6 +371,23 @@ async function processAnalysis(request) {
   // Final fallback: heuristic
   
   const { license } = await chrome.storage.local.get(['license']);
+
+  // STEP 0: Local ONNX pre-filter (50-200ms, no token cost)
+  const src = imageData.src || '';
+  if (src.startsWith('https://') && !imageData.isVideoFrame) {
+    const local = await runLocalInference(src);
+    if (local) {
+      if (local.aiScore >= ONNX_THRESHOLDS.AI_CONFIDENT) {
+        log('⚡ [ONNX] High-confidence AI → skip API');
+        return buildLocalResult(local.aiScore, true);
+      }
+      if (local.aiScore <= ONNX_THRESHOLDS.REAL_CONFIDENT) {
+        log('⚡ [ONNX] High-confidence Real → skip API');
+        return buildLocalResult(local.aiScore, false);
+      }
+      log('⚡ [ONNX] Uncertain → proceeding to API');
+    }
+  }
 
   // STEP 1: Try Faux Spy proxy backend
   log('🎯 [FAUXSPY] Calling backend proxy...');

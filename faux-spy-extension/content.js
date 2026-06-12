@@ -341,6 +341,8 @@ function getMethodLabel(method) {
     case 'hive_api':
     case 'hive_api_pro':
       return '✓ SIGNAL';
+    case 'local_onnx':
+      return '⚡ Fast Local Scan';
     case 'heuristic':
       return '⚠ Heuristic Fallback';
     case 'cached':
