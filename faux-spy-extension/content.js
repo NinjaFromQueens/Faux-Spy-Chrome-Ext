@@ -368,7 +368,7 @@ function getConfidenceLevel(aiProbability, result) {
           label: result.verdictLabel || 'No AI Detected',
           icon: '✅',
           color: 'human-very-low',
-          description: 'No AI generation detected'
+          description: 'No AI signals detected — no detector is 100% accurate'
         };
 
       case 'manipulated':
@@ -432,7 +432,7 @@ function getConfidenceLevel(aiProbability, result) {
   const percentage = aiProbability * 100;
   
   if (percentage >= 85) {
-    return { level: 'very-high', label: 'Definitely Faux', icon: '🚨', color: 'ai-very-high', description: 'Caught red-handed — this is AI-generated' };
+    return { level: 'very-high', label: 'Very Likely AI', icon: '🚨', color: 'ai-very-high', description: 'Strong AI signals detected' };
   } else if (percentage >= 65) {
     return { level: 'high', label: 'Likely Faux', icon: '⚠️', color: 'ai-high', description: 'Strong evidence of AI generation' };
   } else if (percentage >= 40) {
@@ -2098,7 +2098,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle sensitivity change from settings
   if (request.action === 'sensitivityChanged') {
-    state.sensitivity = request.sensitivity;
+    const VALID_SENSITIVITY = ['strict', 'balanced', 'sensitive'];
+    if (VALID_SENSITIVITY.includes(request.sensitivity)) {
+      state.sensitivity = request.sensitivity;
+    }
     log(`🎯 Sensitivity updated: ${state.sensitivity}`);
     sendResponse({ success: true });
   }
@@ -2159,7 +2162,7 @@ function showAnimatedResultPanel(img, result) {
     <div class="ai-panel-body">
       ${imageUrl ? `
         <div class="ai-panel-preview">
-          <img src="${imageUrl.replace(/"/g, '%22')}" alt="Scanned image" />
+          <img src="${escapeHtml(imageUrl)}" alt="Scanned image" />
           <div class="ai-panel-preview-name">${escapeHtml(imageName)}</div>
         </div>
       ` : ''}
@@ -2187,7 +2190,11 @@ function showAnimatedResultPanel(img, result) {
         <span class="ai-verdict-icon">${confidence.icon}</span>
         <span class="ai-verdict-label">${confidence.label}</span>
       </div>
-      
+      ${(confidence.level === 'very-low' || confidence.level === 'low') ? `
+      <div style="margin-top:6px;font-size:11px;color:#94a3b8;text-align:center;padding:0 8px;">
+        No detector is 100% accurate — use alongside your own judgment
+      </div>` : ''}
+
       <div class="ai-panel-details">
         <div class="ai-detail-row">
           <span>Confidence:</span>
@@ -2234,7 +2241,7 @@ function showAnimatedResultPanel(img, result) {
       ${result.proHint ? `
         <div class="ai-panel-pro-hint">
           <span class="ai-pro-hint-icon">💎</span>
-          <span class="ai-pro-hint-text">${result.proHint}</span>
+          <span class="ai-pro-hint-text">${escapeHtml(result.proHint)}</span>
           <a href="https://www.fauxspy.com/pro" target="_blank" class="ai-pro-hint-link">Upgrade →</a>
         </div>
       ` : ''}
