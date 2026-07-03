@@ -1,0 +1,64 @@
+{
+  "manifest_version": 3,
+  "name": "Faux Spy - AI Image Detector",
+  "version": "1.9.3",
+  "description": "Right-click any photo to find out if it's real or AI-generated. Works on Instagram, Pinterest, X, and anywhere else.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "fauxspy@fauxspy.com",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage"
+  ],
+  "homepage_url": "https://www.fauxspy.com",
+  "host_permissions": [
+    "https://fauxspy.com/*",
+    "https://www.fauxspy.com/*",
+    "https://o4511531878252544.ingest.us.sentry.io/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Faux Spy - Detect AI Images",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "scripts": ["sentry-reporter.js", "license.js", "background-ff-shim.js", "background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-ff-keepalive.js", "content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png",
+    "512": "icons/icon512.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["upgrade.html", "upgrade.js", "history.html", "history.js"],
+      "matches": ["https://fauxspy.com/*", "https://www.fauxspy.com/*"]
+    }
+  ]
+}

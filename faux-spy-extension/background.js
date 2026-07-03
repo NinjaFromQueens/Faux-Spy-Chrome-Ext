@@ -63,6 +63,7 @@ async function fetchImagePixels(url) {
     const bitmap = await createImageBitmap(blob, { resizeWidth: 224, resizeHeight: 224, resizeQuality: 'medium' });
     const canvas = new OffscreenCanvas(224, 224);
     const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0);
     return ctx.getImageData(0, 0, 224, 224).data;
   } catch (e) {
@@ -108,6 +109,7 @@ async function runLocalInference(url) {
 
 function buildLocalResult(aiScore, isAI) {
   const pct = Math.round(aiScore * 100);
+  const realPct = 100 - pct;
   return {
     success: true,
     isAI,
@@ -115,11 +117,16 @@ function buildLocalResult(aiScore, isAI) {
     confidence: Math.abs(aiScore - 0.5) * 2,
     verdict: isAI ? 'ai_photo' : 'real',
     category: isAI ? 'ai_photo' : 'real',
-    verdictLabel: isAI ? 'AI Detected' : 'No AI Detected',
+    verdictLabel: isAI ? 'Very Likely AI' : 'No AI Detected',
     method: 'local_onnx',
+    proHint: isAI ? 'Pro detects whether this is AI Photo or AI Art' : null,
     indicators: [
-      isAI ? `Local model: ${pct}% AI probability` : `Local model: ${100 - pct}% real probability`,
-      '⚡ Fast local scan — no API call'
+      isAI
+        ? `AI confidence: ${pct}% — strong AI generation signals detected`
+        : `Real confidence: ${realPct}% — no AI signals detected`,
+      isAI
+        ? 'ℹ️ Scanned by local model — upgrade to Pro for full API breakdown'
+        : 'ℹ️ Note: Photo manipulation (face swaps, filters) can evade AI detectors — trust your instincts'
     ],
     localOnly: true,
     timestamp: Date.now()
@@ -149,7 +156,7 @@ chrome.runtime.onInstalled.addListener(() => {
     id: 'checkAI',
     title: '🕵️ Investigate this image',
     contexts: ['image']
-  });
+  }, () => { void chrome.runtime.lastError; });
   
   log('🕵️ Faux Spy installed - Context menu created');
   
@@ -379,15 +386,16 @@ async function processAnalysis(request) {
   if (src.startsWith('https://') && !imageData.isVideoFrame) {
     const local = await runLocalInference(src);
     if (local) {
-      if (local.aiScore >= ONNX_THRESHOLDS.AI_CONFIDENT) {
-        log('⚡ [ONNX] High-confidence AI → skip API');
+      const isPro = license?.isPro === true;
+      if (local.aiScore >= ONNX_THRESHOLDS.AI_CONFIDENT && !isPro) {
+        log('⚡ [ONNX] High-confidence AI → skip API (free tier)');
         return buildLocalResult(local.aiScore, true);
       }
-      if (local.aiScore <= ONNX_THRESHOLDS.REAL_CONFIDENT) {
-        log('⚡ [ONNX] High-confidence Real → skip API');
+      if (local.aiScore <= ONNX_THRESHOLDS.REAL_CONFIDENT && !isPro) {
+        log('⚡ [ONNX] High-confidence Real → skip API (free tier)');
         return buildLocalResult(local.aiScore, false);
       }
-      log('⚡ [ONNX] Uncertain → proceeding to API');
+      log('⚡ [ONNX] Uncertain or Pro user → proceeding to API');
     }
   }
 

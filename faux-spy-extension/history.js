@@ -52,6 +52,13 @@ function renderCases() {
 
   emptyState.style.display = 'none';
   grid.innerHTML = filtered.map(entry => buildCard(entry)).join('');
+  grid.querySelectorAll('img.card-image').forEach(img => {
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      const ph = img.nextElementSibling;
+      if (ph) ph.style.display = 'flex';
+    });
+  });
 }
 
 function filterCases(cases, filter) {
@@ -74,7 +81,7 @@ function buildCard(entry) {
   const safeTitle = escapeHtml(entry.pageTitle || domain);
 
   const imageHtml = safeUrl
-    ? `<img class="card-image" src="${safeUrl}" alt="Scanned image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    ? `<img class="card-image" src="${safeUrl}" alt="Scanned image" loading="lazy">
        <div class="card-image-placeholder" style="display:none;">🖼️</div>`
     : `<div class="card-image-placeholder">🖼️</div>`;
 

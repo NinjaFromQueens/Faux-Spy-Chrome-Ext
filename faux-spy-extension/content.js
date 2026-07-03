@@ -287,14 +287,22 @@ function checkAchievements() {
 function showAchievementToast(achievement) {
   const toast = document.createElement('div');
   toast.className = 'ai-achievement-toast';
-  toast.innerHTML = `
-    <div class="ai-achievement-icon">${achievement.icon}</div>
-    <div class="ai-achievement-text">
-      <div class="ai-achievement-title">🏆 Achievement Unlocked!</div>
-      <div class="ai-achievement-name">${achievement.name}</div>
-      <div class="ai-achievement-desc">${achievement.desc}</div>
-    </div>
-  `;
+  const iconEl = document.createElement('div');
+  iconEl.className = 'ai-achievement-icon';
+  iconEl.textContent = achievement.icon;
+  const textEl = document.createElement('div');
+  textEl.className = 'ai-achievement-text';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'ai-achievement-title';
+  titleEl.textContent = '🏆 Achievement Unlocked!';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'ai-achievement-name';
+  nameEl.textContent = achievement.name;
+  const descEl = document.createElement('div');
+  descEl.className = 'ai-achievement-desc';
+  descEl.textContent = achievement.desc;
+  textEl.append(titleEl, nameEl, descEl);
+  toast.append(iconEl, textEl);
   
   toast.style.cssText = `
     position: fixed !important;
@@ -383,10 +391,10 @@ function getConfidenceLevel(aiProbability, result) {
       case 'digital_art':
         return {
           level: 'digital-art',
-          label: result.verdictLabel || 'Digital Art',
+          label: result.verdictLabel || 'Human-Made Art',
           icon: '🎨',
           color: 'digital-art',
-          description: 'Human-made digital art (painting, render, illustration)'
+          description: 'Human-created artwork — not AI-generated'
         };
         
       case 'inconclusive':
@@ -434,7 +442,7 @@ function getConfidenceLevel(aiProbability, result) {
   if (percentage >= 85) {
     return { level: 'very-high', label: 'Very Likely AI', icon: '🚨', color: 'ai-very-high', description: 'Strong AI signals detected' };
   } else if (percentage >= 65) {
-    return { level: 'high', label: 'Likely Faux', icon: '⚠️', color: 'ai-high', description: 'Strong evidence of AI generation' };
+    return { level: 'high', label: 'Likely AI', icon: '⚠️', color: 'ai-high', description: 'Strong evidence of AI generation' };
   } else if (percentage >= 40) {
     return { level: 'inconclusive', label: 'Inconclusive', icon: '❓', color: 'inconclusive', description: 'Filters or editing may be affecting detection' };
   } else if (percentage >= 20) {
@@ -996,7 +1004,11 @@ function showUpgradePrompt(img, usageCheck) {
   const badge = document.createElement('div');
   badge.className = 'ai-badge ai-badge-upgrade';
   const labelText = usageCheck.upgradeLabel || 'Upgrade';
-  badge.innerHTML = `<span>⭐</span><span>${labelText}</span>`;
+  const star = document.createElement('span');
+  star.textContent = '⭐';
+  const label = document.createElement('span');
+  label.textContent = labelText;
+  badge.append(star, label);
   badge.title = `${usageCheck.message}\nClick for details`;
   badge.style.cursor = 'pointer';
 
@@ -2190,10 +2202,9 @@ function showAnimatedResultPanel(img, result) {
         <span class="ai-verdict-icon">${confidence.icon}</span>
         <span class="ai-verdict-label">${confidence.label}</span>
       </div>
-      ${(confidence.level === 'very-low' || confidence.level === 'low') ? `
       <div style="margin-top:6px;font-size:11px;color:#94a3b8;text-align:center;padding:0 8px;">
-        No detector is 100% accurate — use alongside your own judgment
-      </div>` : ''}
+        ⚠️ No detector is 100% accurate — treat as one signal, not a final verdict
+      </div>
 
       <div class="ai-panel-details">
         <div class="ai-detail-row">
@@ -2211,13 +2222,25 @@ function showAnimatedResultPanel(img, result) {
           ${result.trace && result.trace.status === 'ok' ? `
           <div class="ai-engine-block ai-engine-trace">
             <div class="ai-engine-name">TRACE</div>
-            <div class="ai-engine-value">${result.trace.photoScore !== undefined ? (result.trace.illustrationScore >= 0.5 ? 'Art' : 'Photo') : '—'}</div>
+            <div class="ai-engine-value">${result.trace.photoScore !== undefined ? (result.trace.illustrationScore >= 0.5 ? 'Illustration' : 'Photo') : '—'}</div>
             <div class="ai-engine-label">type${result.trace.deepfakeScore > 0.5 ? ' · ⚠️ manip' : ''}</div>
           </div>` : ''}
+        </div>` : result.method === 'local_onnx' ? `
+        <div class="ai-engines-row">
+          <div class="ai-engine-block ai-engine-signal">
+            <div class="ai-engine-name">LOCAL</div>
+            <div class="ai-engine-value">${Math.round((result.aiProbability || 0) * 100)}%</div>
+            <div class="ai-engine-label">AI score</div>
+          </div>
+          <div class="ai-engine-block ai-engine-trace">
+            <div class="ai-engine-name">METHOD</div>
+            <div class="ai-engine-value">Fast</div>
+            <div class="ai-engine-label">local scan</div>
+          </div>
         </div>` : `
         <div class="ai-detail-row">
           <span>Method:</span>
-          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : result.method === 'local_onnx' ? 'onnx' : 'api'}">${getMethodLabel(result.method)}</span>
+          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : 'api'}">${getMethodLabel(result.method)}</span>
         </div>`}
         <div class="ai-detail-row">
           <span>Sensitivity:</span>
@@ -2459,6 +2482,8 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
           navigator.clipboard.writeText(shareText).then(() => {
             showShareFeedback('✓ Copied to clipboard!');
             closeMenu();
+          }).catch(() => {
+            showShareFeedback('⚠️ Copy failed');
           });
           break;
         
@@ -2486,6 +2511,8 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
             navigator.clipboard.writeText(imageUrl).then(() => {
               showShareFeedback('✓ Image URL copied!');
               closeMenu();
+            }).catch(() => {
+              showShareFeedback('⚠️ Copy failed');
             });
           }
           break;
