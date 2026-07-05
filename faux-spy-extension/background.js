@@ -370,7 +370,7 @@ async function analyzeVideo(request, callback) {
 
     let result;
     try {
-      const response = await fetch('https://www.fauxspy.com/api/detect-video', {
+      const response = await fetch(`${BACKEND_URL}/api/detect-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -380,6 +380,7 @@ async function analyzeVideo(request, callback) {
         }),
         signal: controller.signal
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       result = await response.json();
     } finally {
       clearTimeout(timeoutId);
@@ -432,7 +433,7 @@ async function queueAnalysis(request, callback) {
   requestQueue.push({ request, callback });
   
   if (!isProcessingQueue) {
-    processQueue();
+    processQueue().catch(err => log('Queue error:', err.message));
   }
 }
 
@@ -464,12 +465,12 @@ async function processQueue() {
     callback(result);
   } catch (error) {
     console.error('Queue processing error:', error);
-    callback(null);
+    callback({ success: false, error: 'INTERNAL_ERROR', isAI: false, aiProbability: 0 });
   }
   
   // Continue processing queue
   if (requestQueue.length > 0) {
-    setTimeout(() => processQueue(), MIN_REQUEST_INTERVAL);
+    processQueue().catch(err => log('Queue error:', err.message));
   } else {
     isProcessingQueue = false;
   }
@@ -498,21 +499,21 @@ async function processAnalysis(request) {
   
   const { license } = await chrome.storage.local.get(['license']);
 
-  // STEP 0: Local ONNX pre-filter (50-200ms, no token cost)
+  // STEP 0: Local ONNX pre-filter (50-200ms, no token cost, free tier only)
+  const isPro = license?.isPro === true;
   const src = imageData.src || '';
-  if (src.startsWith('https://') && !imageData.isVideoFrame) {
+  if (!isPro && src.startsWith('https://') && !imageData.isVideoFrame) {
     const local = await runLocalInference(src);
     if (local) {
-      const isPro = license?.isPro === true;
-      if (local.aiScore >= ONNX_THRESHOLDS.AI_CONFIDENT && !isPro) {
+      if (local.aiScore >= ONNX_THRESHOLDS.AI_CONFIDENT) {
         log('⚡ [ONNX] High-confidence AI → skip API (free tier)');
         return buildLocalResult(local.aiScore, true);
       }
-      if (local.aiScore <= ONNX_THRESHOLDS.REAL_CONFIDENT && !isPro) {
+      if (local.aiScore <= ONNX_THRESHOLDS.REAL_CONFIDENT) {
         log('⚡ [ONNX] High-confidence Real → skip API (free tier)');
         return buildLocalResult(local.aiScore, false);
       }
-      log('⚡ [ONNX] Uncertain or Pro user → proceeding to API');
+      log('⚡ [ONNX] Uncertain → proceeding to API');
     }
   }
 
@@ -1007,9 +1008,9 @@ async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pa
     
     // Add transparency note about heuristic uncertainty
     if (confidence >= 0.40 && confidence < 0.60) {
-      indicators.push('⚠️ Inconclusive - configure Hive AI for accurate detection');
+      indicators.push('⚠️ Inconclusive — detection service temporarily unavailable');
     } else if (confidence < 0.40) {
-      indicators.push('Heuristic-only analysis - configure Hive AI for verification');
+      indicators.push('Heuristic-only analysis — detection service temporarily unavailable');
     }
     
     log(`🔍 [HEURISTIC] Final score: ${(confidence * 100).toFixed(1)}%`);
@@ -1023,7 +1024,7 @@ async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pa
       indicators: indicators,
       method: 'heuristic',
       // v1.2: Always warn about heuristic limitations
-      warning: 'Heuristic-only detection (limited accuracy). Configure Hive AI in HQ Settings for industry-leading accuracy.'
+      warning: 'Heuristic-only detection (limited accuracy). Detection service temporarily unavailable — try again shortly.'
     };
     
   } catch (error) {
@@ -1066,12 +1067,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? request.url
       : fallback;
     chrome.tabs.create({ url });
-    return true;
+    sendResponse();
+    return false;
   }
-  
+
   if (request.action === 'openPortal') {
     openCustomerPortal();
-    return true;
+    sendResponse();
+    return false;
   }
   
   if (request.action === 'checkLicense') {
