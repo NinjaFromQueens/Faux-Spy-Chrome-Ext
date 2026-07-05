@@ -779,7 +779,11 @@ async function scanImage(img) {
 
       // v8.1: Show animated result panel if enabled
       if (state.showResultPanel && state.scanMode === 'detective') {
-        showAnimatedResultPanel(img, result);
+        try {
+          showAnimatedResultPanel(img, result);
+        } catch (panelErr) {
+          console.error('❌ Panel render error:', panelErr);
+        }
       }
       
       log('✅ Scan complete!');
@@ -986,9 +990,13 @@ function showError(img, message) {
     const badge = document.createElement('div');
     badge.className = 'ai-badge ai-badge-error';
     badge.title = message;
+    const label = message === 'UNSCANNABLE_URL' ? 'Can\'t scan'
+      : message === 'PROXY_ERROR' ? 'Blocked'
+      : message === 'SERVICE_UNAVAILABLE' ? 'Unavailable'
+      : 'Error';
     badge.innerHTML = `
       <span>⚠️</span>
-      <span>Error</span>
+      <span>${label}</span>
       <a class="ai-badge-report" href="https://www.fauxspy.com/contact" target="_blank" rel="noopener" title="Report this issue to Faux Spy">↗</a>
     `;
     wrapper.appendChild(badge);
@@ -2332,13 +2340,14 @@ function showAnimatedResultPanel(img, result) {
   }, 100);
   
   // Close button
-  panel.querySelector('.ai-panel-close').onclick = () => panel.remove();
-  panel.querySelector('.ai-action-close').onclick = () => panel.remove();
-  
+  const closeBtn = panel.querySelector('.ai-panel-close');
+  if (closeBtn) closeBtn.onclick = () => panel.remove();
+  const actionCloseBtn = panel.querySelector('.ai-action-close');
+  if (actionCloseBtn) actionCloseBtn.onclick = () => panel.remove();
+
   // Share button - pass image URL too
-  panel.querySelector('.ai-action-share').onclick = () => {
-    shareResultV8(result, confidence, imageUrl);
-  };
+  const shareBtn = panel.querySelector('.ai-action-share');
+  if (shareBtn) shareBtn.onclick = () => shareResultV8(result, confidence, imageUrl);
   
   // v8.4: Don't auto-close - let user dismiss when ready
   // Auto-close removed since panel can now be dragged
@@ -2406,6 +2415,13 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
     </div>
     
     <div class="ai-share-options">
+      ${imageUrl ? `
+        <button class="ai-share-option ai-share-option-image" data-platform="shareimage">
+          <span class="ai-share-icon">🖼️</span>
+          <span>Share as Image Card</span>
+        </button>
+      ` : ''}
+
       <button class="ai-share-option" data-platform="copy">
         <span class="ai-share-icon">📋</span>
         <span>Copy to Clipboard</span>
@@ -2478,6 +2494,10 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
       const encodedUrl = imageUrl ? encodeURIComponent(imageUrl) : '';
       
       switch (platform) {
+        case 'shareimage':
+          generateAndShare(result, confidence, imageUrl, btn, closeMenu);
+          break;
+
         case 'copy':
           navigator.clipboard.writeText(shareText).then(() => {
             showShareFeedback('✓ Copied to clipboard!');
@@ -2488,22 +2508,15 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
           break;
         
         case 'twitter':
-          window.open(`https://twitter.com/intent/tweet?text=${encodedText}`, '_blank', 'width=600,height=400');
-          closeMenu();
+          shareToTwitterWithCard(result, confidence, imageUrl, shareText, btn, closeMenu);
           break;
         
         case 'facebook':
-          if (imageUrl) {
-            window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`, '_blank', 'width=600,height=400');
-          } else {
-            window.open(`https://www.facebook.com/sharer/sharer.php?quote=${encodedText}`, '_blank', 'width=600,height=400');
-          }
-          closeMenu();
+          shareToFacebookWithCard(result, confidence, imageUrl, shareText, btn, closeMenu);
           break;
-        
+
         case 'reddit':
-          window.open(`https://www.reddit.com/submit?title=${encodedText}${imageUrl ? `&url=${encodedUrl}` : ''}`, '_blank', 'width=600,height=400');
-          closeMenu();
+          shareToRedditWithCard(result, confidence, imageUrl, shareText, btn, closeMenu);
           break;
         
         case 'copyimage':
@@ -2519,6 +2532,169 @@ function showShareMenu(shareText, imageUrl, result, confidence) {
       }
     };
   });
+}
+
+// Share to X/Twitter: generate branded card → copy to clipboard → open tweet compose
+async function shareToTwitterWithCard(result, confidence, imageUrl, tweetText, btn, closeMenu) {
+  const originalHTML = btn.innerHTML;
+  let cardCopied = false;
+
+  try {
+    btn.innerHTML = '<span class="ai-share-icon">⏳</span><span>Preparing tweet...</span>';
+    btn.disabled = true;
+
+    const aiPercent = Math.round((result.aiProbability || 0) * 100);
+    const response = await chrome.runtime.sendMessage({
+      type: 'GENERATE_SHARE_CARD',
+      imageUrl,
+      label: confidence.label,
+      icon: confidence.icon,
+      category: result.category || '',
+      aiPercent
+    });
+
+    if (response?.success) {
+      const res = await fetch(response.dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      cardCopied = true;
+    }
+  } catch (e) {
+    // Card generation or clipboard failed — fall through to text-only tweet
+  } finally {
+    btn.innerHTML = originalHTML;
+    btn.disabled = false;
+  }
+
+  const encodedText = encodeURIComponent(tweetText);
+  window.open(`https://twitter.com/intent/tweet?text=${encodedText}`, '_blank', 'width=600,height=400');
+  closeMenu();
+
+  if (cardCopied) {
+    showShareFeedback('🖼️ Image copied — paste it in your tweet (Ctrl+V)!');
+  }
+}
+
+// Share to Facebook: generate branded card → copy to clipboard → open sharer → toast
+async function shareToFacebookWithCard(result, confidence, imageUrl, shareText, btn, closeMenu) {
+  const originalHTML = btn.innerHTML;
+  let cardCopied = false;
+  try {
+    btn.innerHTML = '<span class="ai-share-icon">⏳</span><span>Preparing...</span>';
+    btn.disabled = true;
+    const aiPercent = Math.round((result.aiProbability || 0) * 100);
+    const response = await chrome.runtime.sendMessage({
+      type: 'GENERATE_SHARE_CARD', imageUrl,
+      label: confidence.label, icon: confidence.icon,
+      category: result.category || '', aiPercent
+    });
+    if (response?.success) {
+      const res = await fetch(response.dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      cardCopied = true;
+    }
+  } catch (e) {
+    // Fall through to text-only share
+  } finally {
+    btn.innerHTML = originalHTML;
+    btn.disabled = false;
+  }
+  const encodedText = encodeURIComponent(shareText);
+  window.open(`https://www.facebook.com/sharer/sharer.php?quote=${encodedText}`, '_blank', 'width=600,height=400');
+  closeMenu();
+  if (cardCopied) showShareFeedback('🖼️ Image card copied — paste it in your post!');
+}
+
+// Share to Reddit: generate branded card → copy to clipboard → open submit page → toast
+async function shareToRedditWithCard(result, confidence, imageUrl, shareText, btn, closeMenu) {
+  const originalHTML = btn.innerHTML;
+  let cardCopied = false;
+  try {
+    btn.innerHTML = '<span class="ai-share-icon">⏳</span><span>Preparing...</span>';
+    btn.disabled = true;
+    const aiPercent = Math.round((result.aiProbability || 0) * 100);
+    const response = await chrome.runtime.sendMessage({
+      type: 'GENERATE_SHARE_CARD', imageUrl,
+      label: confidence.label, icon: confidence.icon,
+      category: result.category || '', aiPercent
+    });
+    if (response?.success) {
+      const res = await fetch(response.dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      cardCopied = true;
+    }
+  } catch (e) {
+    // Fall through to text-only share
+  } finally {
+    btn.innerHTML = originalHTML;
+    btn.disabled = false;
+  }
+  const encodedText = encodeURIComponent(shareText);
+  window.open(`https://www.reddit.com/submit?title=${encodedText}`, '_blank', 'width=600,height=400');
+  closeMenu();
+  if (cardCopied) showShareFeedback('🖼️ Image card copied — paste it in your post!');
+}
+
+// Generate branded share card image and share/download it
+async function generateAndShare(result, confidence, imageUrl, btn, closeMenu) {
+  let originalHTML = '';
+  try {
+    originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="ai-share-icon">⏳</span><span>Generating card...</span>';
+    btn.disabled = true;
+    const aiPercent = Math.round((result.aiProbability || 0) * 100);
+    const response = await chrome.runtime.sendMessage({
+      type: 'GENERATE_SHARE_CARD',
+      imageUrl,
+      label: confidence.label,
+      icon: confidence.icon,
+      category: result.category || '',
+      aiPercent
+    });
+
+    if (!response?.success) throw new Error(response?.reason || 'card failed');
+
+    const res = await fetch(response.dataUrl);
+    const blob = await res.blob();
+    const file = new File([blob], 'faux-spy-verdict.png', { type: 'image/png' });
+
+    closeMenu();
+
+    // Try Web Share API with file (works on mobile and Chrome 97+)
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ title: `Faux Spy: ${confidence.label}`, files: [file] });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return; // user cancelled
+      }
+    }
+
+    // Fallback: copy PNG to clipboard
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      showShareFeedback('✓ Image card copied to clipboard!');
+      return;
+    } catch (e) {}
+
+    // Final fallback: download
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = 'faux-spy-verdict.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
+    showShareFeedback('✓ Card downloaded!');
+
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
+    showShareFeedback("⚠️ Couldn't load image — use text share instead");
+  }
 }
 
 // Show feedback toast for share actions

@@ -72,6 +72,118 @@ async function fetchImagePixels(url) {
   }
 }
 
+async function generateShareCard({ imageUrl, label, icon, category, aiPercent }) {
+  try {
+    // Fetch logo
+    const logoUrl = chrome.runtime.getURL('icons/icon512.png');
+    const logoResp = await fetch(logoUrl);
+    const logoBlob = await logoResp.blob();
+    const logoBitmap = await createImageBitmap(logoBlob);
+
+    // Try to fetch scanned image — may fail due to CORS restrictions on social CDNs
+    let imgBitmap = null;
+    if (imageUrl) {
+      try {
+        const imgResp = await fetch(imageUrl, { mode: 'cors', credentials: 'omit' });
+        if (imgResp.ok) {
+          imgBitmap = await createImageBitmap(await imgResp.blob());
+        }
+      } catch (_corsErr) {
+        // CORS blocked — will use branded gradient background instead
+      }
+    }
+
+    const W = 1080, H = 1080, IMG_H = 680, SEP = 3;
+    const canvas = new OffscreenCanvas(W, H);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas context unavailable');
+
+    if (imgBitmap) {
+      // Draw scanned image (cover crop into top IMG_H px)
+      const scale = Math.max(W / imgBitmap.width, IMG_H / imgBitmap.height);
+      const drawW = imgBitmap.width * scale;
+      const drawH = imgBitmap.height * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, W, IMG_H);
+      ctx.clip();
+      ctx.drawImage(imgBitmap, (W - drawW) / 2, (IMG_H - drawH) / 2, drawW, drawH);
+      ctx.restore();
+    } else {
+      // Branded fallback background when image is CORS-blocked
+      const grad = ctx.createLinearGradient(0, 0, W, IMG_H);
+      grad.addColorStop(0, '#0d1117');
+      grad.addColorStop(1, '#1a2332');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, IMG_H);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '240px system-ui, -apple-system, sans-serif';
+      ctx.globalAlpha = 0.18;
+      ctx.fillText(icon, W / 2, IMG_H / 2);
+      ctx.globalAlpha = 1;
+    }
+
+    // Gold separator
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(0, IMG_H, W, SEP);
+
+    // Info strip background
+    const stripY = IMG_H + SEP;
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, stripY, W, H - stripY);
+
+    // Logo (top-left of strip)
+    const logoSize = 80;
+    const logoX = 40, logoY = stripY + 22;
+    ctx.drawImage(logoBitmap, logoX, logoY, logoSize, logoSize);
+
+    // Brand text
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
+    ctx.fillText('Faux Spy', logoX + logoSize + 18, logoY + 44);
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '22px system-ui, -apple-system, sans-serif';
+    ctx.fillText('fauxspy.com', logoX + logoSize + 18, logoY + 76);
+
+    // Verdict color
+    let verdictColor = '#f59e0b';
+    if (category === 'real') verdictColor = '#22c55e';
+    else if (category === 'ai_photo' || category === 'ai') verdictColor = '#ef4444';
+
+    // Verdict label (large, centered)
+    ctx.textAlign = 'center';
+    ctx.fillStyle = verdictColor;
+    ctx.font = `bold 76px system-ui, -apple-system, sans-serif`;
+    ctx.fillText(`${icon}  ${label}`, W / 2, stripY + 155);
+
+    // Confidence line
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = 'bold 46px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${aiPercent}% Faux · ${100 - aiPercent}% Real`, W / 2, stripY + 235);
+
+    // Tagline
+    ctx.fillStyle = '#374151';
+    ctx.font = 'italic 26px system-ui, -apple-system, sans-serif';
+    ctx.fillText('Spy on the fakes.', W / 2, stripY + 360);
+
+    // Convert to PNG data URL
+    const blob = await canvas.convertToBlob({ type: 'image/png' });
+    const arrayBuffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return { success: true, dataUrl: 'data:image/png;base64,' + btoa(binary) };
+  } catch (e) {
+    log('⚠️ [ShareCard] Failed:', e.message);
+    return { success: false, reason: e.message };
+  }
+}
+
 function preprocessPixels(pixels) {
   const float32 = new Float32Array(3 * 224 * 224);
   for (let i = 0; i < 224 * 224; i++) {
@@ -224,6 +336,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'analyzeVideo') {
     analyzeVideo(request, sendResponse);
     return true; // Keep channel open for async response
+  }
+
+  if (request.type === 'GENERATE_SHARE_CARD') {
+    generateShareCard(request).then(sendResponse).catch(() => sendResponse({ success: false }));
+    return true;
   }
 });
 
