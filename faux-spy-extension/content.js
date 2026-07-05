@@ -908,6 +908,9 @@ function showLoadingBadge(img) {
     badge.className = 'ai-badge ai-badge-loading';
     badge.innerHTML = '<span class="ai-badge-spinner"></span><span>Scanning...</span>';
     wrapper.appendChild(badge);
+    const scanOverlay = document.createElement('div');
+    scanOverlay.className = 'ai-scan-overlay';
+    wrapper.appendChild(scanOverlay);
   } catch (e) {
     console.warn('Could not show loading badge:', e);
   }
@@ -920,8 +923,8 @@ function removeLoadingBadge(img) {
   // Try overlay first
   const overlay = imageOverlays.get(img);
   if (overlay) {
-    const badge = overlay.querySelector('.ai-badge-loading');
-    if (badge) badge.remove();
+    overlay.querySelector('.ai-badge-loading')?.remove();
+    overlay.querySelector('.ai-scan-overlay')?.remove();
     return;
   }
   
@@ -2157,6 +2160,28 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+function buildExtraIndicators(result) {
+  const rows = [];
+  const pct = v => Math.round((v || 0) * 100);
+
+  if ((result.trace?.deepfakeScore ?? 0) > 0.25)
+    rows.push(`🔧 Manipulation detected: ${pct(result.trace.deepfakeScore)}% confidence`);
+
+  if (result.trace?.genaiScore !== undefined)
+    rows.push(`🤖 GenAI pattern score: ${pct(result.trace.genaiScore)}%`);
+
+  if (result.trace?.illustrationScore !== undefined)
+    rows.push(`🖼️ Image type: Photo ${pct(result.trace.photoScore)}% · Illustration ${pct(result.trace.illustrationScore)}%`);
+
+  if (Array.isArray(result.metadata_signals))
+    result.metadata_signals.forEach(s => rows.push(String(s)));
+
+  if (result.c2pa?.present)
+    rows.push(result.c2pa.valid ? '✅ C2PA content credentials: verified' : '⚠️ C2PA credentials present but invalid');
+
+  return rows.map(r => `<div class="ai-indicator-item">${escapeHtml(r)}</div>`).join('');
+}
+
 function showAnimatedResultPanel(img, result) {
   // Remove any existing panel
   const existing = document.querySelector('.ai-result-panel-v8');
@@ -2262,10 +2287,12 @@ function showAnimatedResultPanel(img, result) {
         ` : ''}
       </div>
       
-      ${result.indicators && result.indicators.length > 0 ? `
+      ${(result.indicators && result.indicators.length > 0) || result.trace || result.metadata_signals || result.c2pa || result.fallback ? `
         <div class="ai-panel-indicators">
           <div class="ai-indicators-title">Investigation Notes:</div>
-          ${result.indicators.map(ind => `<div class="ai-indicator-item">${escapeHtml(String(ind))}</div>`).join('')}
+          ${(result.indicators || []).map(ind => `<div class="ai-indicator-item">${escapeHtml(String(ind))}</div>`).join('')}
+          ${buildExtraIndicators(result)}
+          ${result.fallback && result.warning ? `<div class="ai-indicator-item" style="color:#fbbf24;border-left:2px solid #fbbf24;padding-left:8px;margin-top:4px;">⚠️ ${escapeHtml(result.warning)}</div>` : ''}
         </div>
       ` : ''}
       
