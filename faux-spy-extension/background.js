@@ -492,11 +492,20 @@ async function processAnalysis(request) {
   // Extract imageData from request
   const imageData = request.imageData || request;
   log('🔍 Processing analysis for:', imageData.src?.substring(0, 50));
-  
+
+  // Check cache before hitting API
+  const cachedResult = await checkCache(imageData.src);
+  if (cachedResult) {
+    log('💾 [CACHE] Cache hit');
+    incrementStat('total');
+    incrementStat('cached');
+    return cachedResult;
+  }
+
   // v1.5: Try Faux Spy proxy backend FIRST (uses our Sightengine key)
   // Falls back to user's own Sightengine credentials if proxy fails
   // Final fallback: heuristic
-  
+
   const { license } = await chrome.storage.local.get(['license']);
 
   // STEP 0: Local ONNX pre-filter (50-200ms, no token cost, free tier only)
@@ -507,10 +516,12 @@ async function processAnalysis(request) {
     if (local) {
       if (local.aiScore >= ONNX_THRESHOLDS.AI_CONFIDENT) {
         log('⚡ [ONNX] High-confidence AI → skip API (free tier)');
+        incrementStat('total');
         return buildLocalResult(local.aiScore, true);
       }
       if (local.aiScore <= ONNX_THRESHOLDS.REAL_CONFIDENT) {
         log('⚡ [ONNX] High-confidence Real → skip API (free tier)');
+        incrementStat('total');
         return buildLocalResult(local.aiScore, false);
       }
       log('⚡ [ONNX] Uncertain → proceeding to API');
@@ -523,6 +534,8 @@ async function processAnalysis(request) {
 
   if (proxyResult.method === 'sightengine_api') {
     log('✅ [FAUXSPY] Backend detection succeeded');
+    incrementStat('total');
+    incrementStat('apiCalls');
     return proxyResult;
   }
 

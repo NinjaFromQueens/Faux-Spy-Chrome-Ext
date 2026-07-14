@@ -51,6 +51,12 @@ document.getElementById('clearCacheBtn')?.addEventListener('click', async () => 
 // Initialize
 document.addEventListener('DOMContentLoaded', loadSettings);
 
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.apiStats) {
+    updateStats(changes.apiStats.newValue);
+  }
+});
+
 // ============================================================================
 // v1.6: License Management UI
 // ============================================================================
