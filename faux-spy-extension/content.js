@@ -2571,14 +2571,15 @@ async function shareToTwitterWithCard(result, confidence, imageUrl, tweetText, b
     btn.disabled = true;
 
     const aiPercent = Math.round((result.aiProbability || 0) * 100);
-    const response = await chrome.runtime.sendMessage({
-      type: 'GENERATE_SHARE_CARD',
-      imageUrl,
-      label: confidence.label,
-      icon: confidence.icon,
-      category: result.category || '',
-      aiPercent
-    });
+    const _swMsg = { type: 'GENERATE_SHARE_CARD', imageUrl, label: confidence.label, icon: confidence.icon, category: result.category || '', aiPercent };
+    let response;
+    try {
+      response = await chrome.runtime.sendMessage(_swMsg);
+    } catch (_swDead) {
+      // MV3 service worker was terminated — first sendMessage wakes it; retry after it initializes
+      await new Promise(r => setTimeout(r, 600));
+      response = await chrome.runtime.sendMessage(_swMsg);
+    }
 
     if (response?.success) {
       const res = await fetch(response.dataUrl);
@@ -2672,14 +2673,15 @@ async function generateAndShare(result, confidence, imageUrl, btn, closeMenu) {
     btn.innerHTML = '<span class="ai-share-icon">⏳</span><span>Generating card...</span>';
     btn.disabled = true;
     const aiPercent = Math.round((result.aiProbability || 0) * 100);
-    const response = await chrome.runtime.sendMessage({
-      type: 'GENERATE_SHARE_CARD',
-      imageUrl,
-      label: confidence.label,
-      icon: confidence.icon,
-      category: result.category || '',
-      aiPercent
-    });
+    const _swMsg = { type: 'GENERATE_SHARE_CARD', imageUrl, label: confidence.label, icon: confidence.icon, category: result.category || '', aiPercent };
+    let response;
+    try {
+      response = await chrome.runtime.sendMessage(_swMsg);
+    } catch (_swDead) {
+      // MV3 service worker was terminated — first sendMessage wakes it; retry after it initializes
+      await new Promise(r => setTimeout(r, 600));
+      response = await chrome.runtime.sendMessage(_swMsg);
+    }
 
     if (!response?.success) throw new Error(response?.reason || 'card failed');
 

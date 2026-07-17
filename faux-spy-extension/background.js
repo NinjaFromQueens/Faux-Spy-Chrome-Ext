@@ -84,12 +84,15 @@ async function generateShareCard({ imageUrl, label, icon, category, aiPercent })
     let imgBitmap = null;
     if (imageUrl) {
       try {
-        const imgResp = await fetch(imageUrl, { mode: 'cors', credentials: 'omit' });
+        const imgController = new AbortController();
+        const imgTimeout = setTimeout(() => imgController.abort(), 10000);
+        const imgResp = await fetch(imageUrl, { mode: 'cors', credentials: 'omit', signal: imgController.signal });
+        clearTimeout(imgTimeout);
         if (imgResp.ok) {
           imgBitmap = await createImageBitmap(await imgResp.blob());
         }
       } catch (_corsErr) {
-        // CORS blocked — will use branded gradient background instead
+        // CORS blocked or timed out — will use branded gradient background instead
       }
     }
 
