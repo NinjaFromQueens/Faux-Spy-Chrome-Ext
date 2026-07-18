@@ -509,7 +509,13 @@ async function processAnalysis(request) {
   // Falls back to user's own Sightengine credentials if proxy fails
   // Final fallback: heuristic
 
-  const { license } = await chrome.storage.local.get(['license']);
+  let license;
+  try {
+    const stored = await chrome.storage.local.get(['license']);
+    license = stored.license;
+  } catch (_ctxErr) {
+    license = null; // extension context may be stale; proceed as free tier
+  }
 
   // STEP 0: Local ONNX pre-filter (50-200ms, no token cost, free tier only)
   const isPro = license?.isPro === true;
@@ -567,10 +573,14 @@ async function processAnalysis(request) {
  */
 async function analyzeWithProxy(imageData, license) {
   // Get or create anonymous user ID
-  let { userId } = await chrome.storage.local.get('userId');
+  let userId;
+  try {
+    const stored = await chrome.storage.local.get('userId');
+    userId = stored.userId;
+  } catch (_ctxErr) { /* stale context — userId will be generated below */ }
   if (!userId) {
     userId = 'fs_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
-    await chrome.storage.local.set({ userId });
+    try { await chrome.storage.local.set({ userId }); } catch (_e) { /* best-effort */ }
     log('🆔 Created user ID:', userId);
   }
   

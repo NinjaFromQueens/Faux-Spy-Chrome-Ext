@@ -756,12 +756,21 @@ async function scanImage(img) {
     };
     
     log('📤 Sending to background script:', imageData);
-    
-    const result = await chrome.runtime.sendMessage({
-      action: 'analyzeImage',
-      imageData
-    });
-    
+
+    const _scanMsg = { action: 'analyzeImage', imageData };
+    let result;
+    try {
+      result = await chrome.runtime.sendMessage(_scanMsg);
+    } catch (_swDead) {
+      await new Promise(r => setTimeout(r, 600));
+      result = await chrome.runtime.sendMessage(_scanMsg);
+    }
+    // If the SW context was stale, the first wake restores it — retry once
+    if (result?.error === 'INTERNAL_ERROR') {
+      await new Promise(r => setTimeout(r, 400));
+      try { result = await chrome.runtime.sendMessage(_scanMsg); } catch (_e) { /* fall through */ }
+    }
+
     log('📥 Received result:', result);
     
     removeLoadingBadge(img);
@@ -996,6 +1005,7 @@ function showError(img, message) {
     const label = message === 'UNSCANNABLE_URL' ? 'Can\'t scan'
       : message === 'PROXY_ERROR' ? 'Blocked'
       : message === 'SERVICE_UNAVAILABLE' ? 'Unavailable'
+      : message === 'INTERNAL_ERROR' ? 'Try again'
       : 'Error';
     badge.innerHTML = `
       <span>⚠️</span>
