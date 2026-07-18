@@ -815,6 +815,9 @@ async function incrementStat(statName) {
  */
 async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pageTitle }) {
   try {
+    if (!src) {
+      return { isAI: false, aiProbability: 0.25, confidence: 0.25, indicators: ['No image URL available'], method: 'heuristic' };
+    }
     const indicators = [];
     let aiScore = 0;
     

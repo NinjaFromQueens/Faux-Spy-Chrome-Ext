@@ -825,14 +825,19 @@ async function scanImage(img) {
     state.scannedImages.delete(bestUrl); // allow retry on exception
     console.error('❌ Scan error:', error);
     removeLoadingBadge(img);
-    showError(img, error.message);
+    showError(img, 'INTERNAL_ERROR');
   }
 }
 
 async function checkUsageLimit() {
-  const { license, dailyScans, lastResetDate } = await chrome.storage.local.get([
-    'license', 'dailyScans', 'lastResetDate'
-  ]);
+  let license, dailyScans, lastResetDate;
+  try {
+    ({ license, dailyScans, lastResetDate } = await chrome.storage.local.get([
+      'license', 'dailyScans', 'lastResetDate'
+    ]));
+  } catch (_ctxErr) {
+    return { allowed: true, remaining: 10, isPro: false, limit: 10, scans: 0 };
+  }
 
   if (license?.isPro) {
     // Token system active: check local cache before server round-trip
@@ -871,14 +876,19 @@ async function checkUsageLimit() {
 }
 
 async function incrementDailyScans() {
-  const { license, dailyScans } = await chrome.storage.local.get(['license', 'dailyScans']);
-  if (!license?.isPro) {
-    await chrome.storage.local.set({ dailyScans: (dailyScans || 0) + 1 });
-  }
+  try {
+    const { license, dailyScans } = await chrome.storage.local.get(['license', 'dailyScans']);
+    if (!license?.isPro) {
+      await chrome.storage.local.set({ dailyScans: (dailyScans || 0) + 1 });
+    }
+  } catch (_ctxErr) { /* best-effort; stale context */ }
 }
 
 async function updateSessionStats(result) {
-  let { sessionStats } = await chrome.storage.local.get('sessionStats');
+  let sessionStats;
+  try {
+    ({ sessionStats } = await chrome.storage.local.get('sessionStats'));
+  } catch (_ctxErr) { return; }
   
   if (!sessionStats) {
     sessionStats = { total: 0, ai: 0, human: 0 };
