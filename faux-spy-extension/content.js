@@ -763,7 +763,11 @@ async function scanImage(img) {
       result = await chrome.runtime.sendMessage(_scanMsg);
     } catch (_swDead) {
       await new Promise(r => setTimeout(r, 600));
-      result = await chrome.runtime.sendMessage(_scanMsg);
+      try {
+        result = await chrome.runtime.sendMessage(_scanMsg);
+      } catch (_swDead2) {
+        result = { error: 'INTERNAL_ERROR' }; // triggers INTERNAL_ERROR retry below
+      }
     }
     // If the SW context was stale, the first wake restores it — retry once
     if (result?.error === 'INTERNAL_ERROR') {
@@ -815,7 +819,7 @@ async function scanImage(img) {
     } else {
       state.scannedImages.delete(bestUrl); // allow retry on error
       console.error('❌ Scan failed:', result);
-      showError(img, result?.error || 'Analysis failed');
+      showError(img, result?.error || 'INTERNAL_ERROR');
     }
   } catch (error) {
     state.scannedImages.delete(bestUrl); // allow retry on exception

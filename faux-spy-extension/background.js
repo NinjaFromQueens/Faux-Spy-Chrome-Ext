@@ -1060,7 +1060,7 @@ async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pa
       aiProbability: 0,
       confidence: 0,
       indicators: ['Analysis failed'],
-      error: error.message
+      error: 'INTERNAL_ERROR'
     };
   }
 }
