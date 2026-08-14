@@ -4,7 +4,7 @@
 Faux Spy - AI Image Detector
 
 ## Short Description (132 chars max — also used as manifest.json `description` field)
-Right-click any photo to find out if it's real or AI-generated. Works on Instagram, Pinterest, X, and anywhere else.
+Right-click any image to instantly detect if it's AI-generated or real. Free, no account required.
 
 ## Detailed Description (paste into CWS Developer Console → Store listing → Description)
 
@@ -28,11 +28,17 @@ Faux Spy classifies images into five categories:
 • Digital Art — CGI, renders, heavily edited photos
 • Inconclusive — ambiguous signal (common with small compressed thumbnails)
 
-Detection covers images from today's AI generation tools and updates as new ones come out.
+Detection covers images from today's leading AI generation tools and updates as new generators emerge.
 
-WHERE IT WORKS
+WHERE IT'S USEFUL
 
-Faux Spy runs on any page in Chrome — social media, news sites, dating apps, job boards, anywhere you can see an image in your browser. It handles click interception on platforms that try to block right-click, so the Investigate button works reliably wherever you need it.
+• Dating apps — verify profile photos before you match or message
+• Online marketplaces — check product photos before you buy
+• News and media — confirm whether a photo is authentic before you share it
+• Job recruiting — spot AI-generated headshots in applicant profiles
+• Any website — if you can see an image in Chrome, Faux Spy can check it
+
+AI-generated faces cannot be caught by reverse image search — they are synthetic originals with no prior internet presence. Faux Spy uses pixel-level machine learning to find what your eyes miss.
 
 PRIVACY
 
@@ -42,7 +48,7 @@ FREE & PRO PLANS
 
 Free (no account required):
 • 3 investigations per day
-• 3-category detection: Real Photo, AI Photo, Inconclusive
+• Real Photo, AI Photo, and Inconclusive verdicts
 
 Pro ($9.99/month or $99/year):
 • 200 investigations/month (no daily cap)
@@ -64,5 +70,6 @@ English (United States)
 ## What NOT to do (CWS keyword spam policy)
 Do NOT list 5+ platform names in a row (e.g. "Instagram, Pinterest, X, Facebook, Reddit, LinkedIn, TikTok")
 Do NOT list 5+ AI model names in a row (e.g. "Midjourney, DALL-E, Stable Diffusion, Flux, Imagen, Firefly")
-These were the exact violations that caused the v1.8.0 rejection (Violation ref: Yellow Argon).
+These were the exact violations that caused the v1.8.0 and v1.9.3 rejections (Violation ref: Yellow Argon).
+Use generic category language: "dating apps", "social media", "job boards", "online marketplaces".
 Mention platforms/generators naturally in prose when relevant, not as dump lists.
