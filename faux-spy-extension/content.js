@@ -836,7 +836,7 @@ async function checkUsageLimit() {
       'license', 'dailyScans', 'lastResetDate'
     ]));
   } catch (_ctxErr) {
-    return { allowed: true, remaining: 10, isPro: false, limit: 10, scans: 0 };
+    return { allowed: true, remaining: 3, isPro: false, limit: 3, scans: 0 };
   }
 
   if (license?.isPro) {
@@ -865,7 +865,7 @@ async function checkUsageLimit() {
     await chrome.storage.local.set({ dailyScans: 0, lastResetDate: today });
   }
   
-  const limit = license?.limits?.scansPerDay || 10;
+  const limit = license?.limits?.scansPerDay || 3;
   return {
     allowed: scans < limit,
     remaining: Math.max(0, limit - scans),

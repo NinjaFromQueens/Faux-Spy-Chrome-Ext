@@ -197,9 +197,9 @@ async function getLicense() {
     return freeLicense;
   }
   
-  // Migration: normalize free tier to current 10 scans/day
-  if (license && !license.isPro && license.limits && license.limits.scansPerDay !== 10) {
-    license.limits.scansPerDay = 10;
+  // Migration: normalize free tier to current 3 scans/day (was 10, reduced for conversion)
+  if (license && !license.isPro && license.limits && license.limits.scansPerDay > 3) {
+    license.limits.scansPerDay = 3;
     await chrome.storage.local.set({ license });
   }
   
@@ -266,7 +266,7 @@ async function canScan() {
     scans = 0;
   }
   
-  const limit = license.limits?.scansPerDay || 10;
+  const limit = license.limits?.scansPerDay || 3;
   const remaining = Math.max(0, limit - scans);
   
   return {
@@ -332,7 +332,7 @@ function getDefaultFreeLicense() {
     isPro: false,
     plan: 'free',
     limits: {
-      scansPerDay: 10,
+      scansPerDay: 3,
       caching: false,
       batchScanning: false,
       maxBatchSize: 0,

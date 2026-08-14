@@ -74,7 +74,7 @@ const state = {
   isScanning: false,
   license: null,
   stats: { total: 0, ai: 0, human: 0 },
-  usage: { used: 0, limit: 10 }
+  usage: { used: 0, limit: 3 }
 };
 
 // ============================================================================
@@ -193,7 +193,7 @@ async function fetchLicense() {
   const today = new Date().toDateString();
   const used = (lastResetDate === today) ? (dailyScans || 0) : 0;
   
-  const dailyLimit = license?.limits?.scansPerDay || 10;
+  const dailyLimit = license?.limits?.scansPerDay || 3;
   
   const data = {
     license: license || { isPro: false, plan: 'free' },

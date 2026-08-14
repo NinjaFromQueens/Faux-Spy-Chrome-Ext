@@ -290,17 +290,17 @@ chrome.runtime.onInstalled.addListener(() => {
         isPro: false,
         plan: 'free',
         limits: {
-          scansPerDay: 10,
+          scansPerDay: 3,
           caching: false,
           batchScanning: false,
           maxBatchSize: 0
         }
       };
-      await chrome.storage.local.set({ 
+      await chrome.storage.local.set({
         license: defaultLicense,
         lastLicenseCheck: Date.now()
       });
-      log('✅ Free tier initialized - 10 scans/day');
+      log('✅ Free tier initialized - 3 scans/day');
     }
   });
 });
@@ -325,7 +325,7 @@ async function checkLicense() {
   // No-op - license.js handles this now
   // Kept to prevent errors from old code paths
   const { license } = await chrome.storage.local.get('license');
-  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 10 } };
+  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 3 } };
 }
 
 // Listen for messages from content script
@@ -632,7 +632,7 @@ async function analyzeWithProxy(imageData, license) {
     
     // Daily limit reached - special handling
     if (response.status === 429 || data.error === 'DAILY_LIMIT_REACHED') {
-      const limit = data.limit || 5;
+      const limit = data.limit || 3;
       return {
         isAI: false,
         aiProbability: 0,

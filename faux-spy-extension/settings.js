@@ -188,7 +188,7 @@ if (deactivateLicenseBtn) {
       isPro: false,
       plan: 'free',
       limits: {
-        scansPerDay: 10,
+        scansPerDay: 3,
         caching: false,
         batchScanning: false,
         maxBatchSize: 0

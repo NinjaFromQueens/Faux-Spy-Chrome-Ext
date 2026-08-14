@@ -51,7 +51,7 @@ Only the URL of the image you actively click to check is sent for analysis. No i
 FREE & PRO PLANS
 
 Free (no account required):
-• 10 scans per day
+• 3 scans per day
 • Real Photo, AI Photo, and Inconclusive verdicts
 
 Pro ($9.99/month):

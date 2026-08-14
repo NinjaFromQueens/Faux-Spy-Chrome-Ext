@@ -41,7 +41,7 @@ We only see the URL of the image you actively click to investigate. No images ar
 FREE & PRO PLANS
 
 Free (no account required):
-• 10 investigations per day
+• 3 investigations per day
 • 3-category detection: Real Photo, AI Photo, Inconclusive
 
 Pro ($9.99/month or $99/year):
