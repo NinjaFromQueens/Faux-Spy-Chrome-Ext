@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "description": "Right-click any image to instantly detect if it's AI-generated or real. Free, no account required.",
   "browser_specific_settings": {
     "gecko": {
