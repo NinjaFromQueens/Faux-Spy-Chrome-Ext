@@ -437,7 +437,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'checkVideo') {
     log('🎬 Video context menu clicked for:', info.srcUrl);
 
-    if (!info.srcUrl) {
+    // Blob URLs (YouTube, Twitter, TikTok, etc.) can't be fetched by Sightengine
+    if (!info.srcUrl || info.srcUrl.startsWith('blob:') || info.srcUrl.startsWith('data:')) {
       if (tab?.id) {
         chrome.tabs.sendMessage(tab.id, {
           action: 'showVideoContextResult',

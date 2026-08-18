@@ -1489,23 +1489,35 @@ function showBlobStreamError(video) {
   let platform = 'This site';
   let hint = 'Try hovering the video thumbnail before it plays to scan the preview image instead.';
 
-  if (host.includes('youtube.com')) {
+  if (host.includes('youtube.com') || host.includes('youtu.be')) {
     platform = 'YouTube';
-    hint = 'YouTube uses encrypted streams. Hover the video thumbnail on the home page or sidebar to scan it as an image.';
+    hint = 'YouTube uses encrypted streams. Hover the thumbnail on the home page or sidebar to scan it as an image instead.';
+  } else if (host.includes('x.com') || host.includes('twitter.com')) {
+    platform = 'X (Twitter)';
+    hint = 'X uses encrypted video streams. Hover the post thumbnail image to scan it as an image instead.';
   } else if (host.includes('instagram.com')) {
     platform = 'Instagram';
     hint = 'Instagram uses encrypted streams. Hover the post thumbnail before the video plays to scan it.';
-  } else if (host.includes('facebook.com')) {
+  } else if (host.includes('facebook.com') || host.includes('fb.watch')) {
     platform = 'Facebook';
     hint = 'Facebook uses encrypted streams. Hover the video preview image to scan it.';
   } else if (host.includes('tiktok.com')) {
     platform = 'TikTok';
     hint = 'TikTok uses encrypted streams. Try scanning the cover image thumbnail instead.';
+  } else if (host.includes('pinterest.com') || host.includes('pinterest.co')) {
+    platform = 'Pinterest';
+    hint = 'Pinterest videos are cross-origin protected. Right-click the preview image and select "Check if AI" to scan the thumbnail instead.';
+  } else if (host.includes('reddit.com') || host.includes('redd.it')) {
+    platform = 'Reddit';
+    hint = "Reddit video streams can't be analyzed directly. Try scanning the post thumbnail image instead.";
+  } else if (host.includes('twitch.tv')) {
+    platform = 'Twitch';
+    hint = 'Twitch uses encrypted live streams. Clips and VODs on other sites with a direct .mp4 link can be analyzed.';
   }
 
   showVideoMessage(video, {
     icon: '🔒',
-    title: `${platform} Uses Encrypted Streaming`,
+    title: `${platform} Uses Protected Streaming`,
     body: hint,
     color: 'grey'
   });
@@ -2128,6 +2140,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       showVideoResultPanel(null, request.result);
     } else {
       console.warn('Video context scan failed:', err);
+      showVideoMessage(null, {
+        icon: '❌',
+        title: 'Analysis Failed',
+        body: 'Could not analyze this video. It may use a protected stream or unsupported format.',
+        color: 'grey'
+      });
     }
     sendResponse({ success: true });
     return true;
