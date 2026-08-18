@@ -272,6 +272,12 @@ chrome.runtime.onInstalled.addListener(() => {
     title: '🕵️ Investigate this image',
     contexts: ['image']
   }, () => { void chrome.runtime.lastError; });
+
+  chrome.contextMenus.create({
+    id: 'checkVideo',
+    title: '🎬 Analyze this video',
+    contexts: ['video']
+  }, () => { void chrome.runtime.lastError; });
   
   log('🕵️ Faux Spy installed - Context menu created');
   
@@ -414,15 +420,42 @@ async function analyzeVideo(request, callback) {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'checkAI') {
     log('🖱️ Context menu clicked for:', info.srcUrl);
-    
+
     // Analyze the image
     const result = await processAnalysis({ src: info.srcUrl });
-    
+
     // Show notification in the page
     if (tab?.id) {
       chrome.tabs.sendMessage(tab.id, {
         action: 'showContextResult',
         result: result,
+        src: info.srcUrl
+      }).catch(() => {});
+    }
+  }
+
+  if (info.menuItemId === 'checkVideo') {
+    log('🎬 Video context menu clicked for:', info.srcUrl);
+
+    if (!info.srcUrl) {
+      if (tab?.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'showVideoContextResult',
+          error: 'BLOB_URL'
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // Reuse analyzeVideo — wrap in a promise since it uses callbacks
+    const result = await new Promise(resolve => {
+      analyzeVideo({ videoData: { src: info.srcUrl } }, resolve);
+    });
+
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'showVideoContextResult',
+        result,
         src: info.srcUrl
       }).catch(() => {});
     }

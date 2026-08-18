@@ -157,7 +157,13 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'ðŸ•µï¸ Investigate this image',
     contexts: ['image']
   }, () => { void chrome.runtime.lastError; });
-  
+
+  chrome.contextMenus.create({
+    id: 'checkVideo',
+    title: 'Analyze this video',
+    contexts: ['video']
+  }, () => { void chrome.runtime.lastError; });
+
   log('ðŸ•µï¸ Faux Spy installed - Context menu created');
   
   // v1.6.1: First-run initialization (no hardcoded credentials!)
@@ -304,6 +310,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         result: result,
         src: info.srcUrl
       }).catch(() => {});
+    }
+  }
+
+  if (info.menuItemId === 'checkVideo') {
+    if (!info.srcUrl) {
+      if (tab && tab.id) {
+        chrome.tabs.sendMessage(tab.id, { action: 'showVideoContextResult', error: 'BLOB_URL' }).catch(() => {});
+      }
+      return;
+    }
+    const result = await new Promise(resolve => {
+      analyzeVideo({ videoData: { src: info.srcUrl } }, resolve);
+    });
+    if (tab && tab.id) {
+      chrome.tabs.sendMessage(tab.id, { action: 'showVideoContextResult', result, src: info.srcUrl }).catch(() => {});
     }
   }
 });

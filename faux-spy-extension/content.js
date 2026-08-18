@@ -1769,12 +1769,21 @@ function showVideoResultPanel(video, result) {
 
 function positionVideoPanel(panel, video) {
   requestAnimationFrame(() => {
-    const rect = video.getBoundingClientRect();
     const panelW = 300;
-    let left = rect.left + rect.width / 2 - panelW / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
-    let top = rect.bottom + 8;
-    if (top + 200 > window.innerHeight) top = rect.top - 210;
+    let top, left;
+
+    if (video) {
+      const rect = video.getBoundingClientRect();
+      left = rect.left + rect.width / 2 - panelW / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
+      top = rect.bottom + 8;
+      if (top + 200 > window.innerHeight) top = rect.top - 210;
+    } else {
+      // Context menu path — no video element, center on screen
+      left = Math.max(8, window.innerWidth / 2 - panelW / 2);
+      top = Math.max(8, window.innerHeight / 2 - 120);
+    }
+
     panel.style.cssText = `
       position: fixed;
       top: ${top}px;
@@ -2139,6 +2148,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       console.warn('Context scan failed:', request.result?.error);
     }
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'showVideoContextResult') {
+    const err = request.error || request.result?.error;
+
+    if (err === 'VIDEO_FEATURE_REQUIRED') {
+      showVideoMessage(null, {
+        icon: '🎬',
+        title: 'Pro + Video Required',
+        body: 'AI video detection requires the Pro + Video plan.',
+        linkUrl: 'https://www.fauxspy.com/pro',
+        linkLabel: 'Upgrade to Pro + Video →',
+        color: 'blue'
+      });
+    } else if (err === 'TOKENS_EXHAUSTED') {
+      showVideoMessage(null, {
+        icon: '🪙',
+        title: 'Out of Tokens',
+        body: 'You\'ve used all your video tokens for this month.',
+        linkUrl: 'https://www.fauxspy.com/buy-tokens',
+        linkLabel: 'Buy More Tokens →',
+        color: 'orange'
+      });
+    } else if (err === 'BLOB_URL') {
+      showVideoMessage(null, {
+        icon: '🔒',
+        title: 'Video Not Accessible',
+        body: 'This video uses a protected stream (YouTube, Netflix, etc.) that can\'t be sent for analysis.',
+        color: 'grey'
+      });
+    } else if (err === 'DETECTION_TIMEOUT') {
+      showVideoMessage(null, {
+        icon: '⏱️',
+        title: 'Analysis Timed Out',
+        body: 'The video took too long to analyze. Try a shorter clip.',
+        color: 'grey'
+      });
+    } else if (request.result && !err) {
+      showVideoResultPanel(null, request.result);
+    } else {
+      console.warn('Video context scan failed:', err);
+    }
+
     sendResponse({ success: true });
     return true;
   }
