@@ -129,6 +129,8 @@ async function init() {
   proYearly = document.getElementById('proYearly');
   monthlyButton = document.getElementById('monthlyButton');
   yearlyButton = document.getElementById('yearlyButton');
+  const videoMonthlyButton = document.getElementById('videoMonthlyButton');
+  const videoYearlyButton = document.getElementById('videoYearlyButton');
 
   // Attach toggle listeners
   toggleSwitch?.addEventListener('click', () => switchPlan(currentPlan === 'monthly' ? 'yearly' : 'monthly'));
@@ -138,6 +140,8 @@ async function init() {
   // Attach checkout listeners
   monthlyButton?.addEventListener('click', () => startCheckout('monthly'));
   yearlyButton?.addEventListener('click', () => startCheckout('yearly'));
+  videoMonthlyButton?.addEventListener('click', () => startCheckout('video-monthly'));
+  videoYearlyButton?.addEventListener('click', () => startCheckout('video-yearly'));
 
   // Check for payment callback
   await checkPaymentStatus();

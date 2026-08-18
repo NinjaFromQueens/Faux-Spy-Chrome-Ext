@@ -395,6 +395,27 @@
         
         <button class="plan-button" id="yearlyButton">Start Yearly Plan</button>
       </div>
+
+      <!-- Pro + Video Plan -->
+      <div class="plan-card" id="proVideo" style="border: 2px solid rgba(96,165,250,0.5); background: rgba(59,130,246,0.08);">
+        <div class="recommended-badge" style="background: linear-gradient(135deg,#3b82f6,#1d4ed8);">🎬 + VIDEO</div>
+        <div class="plan-name" style="color: #60a5fa;">Pro + Video</div>
+        <div class="plan-price">$29.99</div>
+        <div class="plan-period">per month</div>
+        <div class="plan-original" style="color: #93c5fd;">or $299/year — save 17%</div>
+
+        <ul class="plan-features">
+          <li><span class="feature-icon">✅</span> Everything in Pro</li>
+          <li><span class="feature-icon">🎬</span> <strong>AI video detection</strong></li>
+          <li><span class="feature-icon">✅</span> Detects Sora, Runway, Pika, Veo</li>
+          <li><span class="feature-icon">✅</span> <strong>500 tokens/month</strong> (10 per video)</li>
+          <li><span class="feature-icon">✅</span> Right-click or hover any video</li>
+          <li><span class="feature-icon">✅</span> Top-ups available, never expire</li>
+        </ul>
+
+        <button class="plan-button" id="videoMonthlyButton" style="background: linear-gradient(135deg,#3b82f6,#1d4ed8);">Subscribe — $29.99/mo</button>
+        <button class="plan-button" id="videoYearlyButton" style="margin-top:8px;background:rgba(59,130,246,0.2);border:1px solid rgba(96,165,250,0.4);">Subscribe — $299/yr</button>
+      </div>
     </div>
 
     <!-- Comparison Table -->
@@ -406,43 +427,57 @@
             <th>Feature</th>
             <th>Free</th>
             <th>Pro</th>
+            <th style="color:#60a5fa;">🎬 Pro+Video</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Daily scans</td>
+            <td>Image scans</td>
             <td>3/day</td>
             <td>200/month</td>
+            <td style="color:#93c5fd;">200/month</td>
           </tr>
           <tr>
-            <td>AI detection accuracy</td>
+            <td>AI image detection</td>
             <td><span class="check">✓</span></td>
             <td><span class="check">✓</span> Enhanced</td>
+            <td><span class="check">✓</span> Enhanced</td>
+          </tr>
+          <tr>
+            <td>AI video detection</td>
+            <td><span class="cross">✗</span></td>
+            <td><span class="cross">✗</span></td>
+            <td style="color:#60a5fa; font-weight:700;"><span class="check">✓</span> 50 videos/mo</td>
           </tr>
           <tr>
             <td>Smart caching</td>
             <td><span class="cross">✗</span></td>
+            <td><span class="check">✓</span></td>
             <td><span class="check">✓</span></td>
           </tr>
           <tr>
             <td>Batch scanning</td>
             <td><span class="cross">✗</span></td>
             <td><span class="check">✓</span> 50 images</td>
-          </tr>
-          <tr>
-            <td>Confidence levels</td>
-            <td><span class="check">✓</span></td>
-            <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span> 50 images</td>
           </tr>
           <tr>
             <td>Priority support</td>
             <td><span class="cross">✗</span></td>
+            <td><span class="check">✓</span></td>
             <td><span class="check">✓</span></td>
           </tr>
           <tr>
             <td>Early access</td>
             <td><span class="cross">✗</span></td>
             <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Price</td>
+            <td>Free</td>
+            <td>$9.99/mo</td>
+            <td style="color:#60a5fa; font-weight:700;">$29.99/mo</td>
           </tr>
         </tbody>
       </table>

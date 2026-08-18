@@ -73,6 +73,9 @@ const proPlan = document.getElementById('proPlan');
 const proEmail = document.getElementById('proEmail');
 const proExpires = document.getElementById('proExpires');
 const proLicenseDisplay = document.getElementById('proLicenseDisplay');
+const videoStatusBox = document.getElementById('videoStatusBox');
+const videoUpgradeHint = document.getElementById('videoUpgradeHint');
+const videoTokenBalance = document.getElementById('videoTokenBalance');
 
 // Show appropriate license state based on stored license
 async function refreshLicenseUI() {
@@ -83,10 +86,28 @@ async function refreshLicenseUI() {
     freeTierState.style.display = 'none';
     proTierState.style.display = 'block';
 
-    proPlan.textContent = license.plan === 'yearly'
-      ? 'Master Spy (Yearly)'
-      : 'Secret Agent (Monthly)';
+    const hasVideo = license.features?.videoDetection;
+    const planLabel = hasVideo
+      ? 'Pro + Video'
+      : (license.plan === 'yearly' ? 'Master Spy (Yearly)' : 'Secret Agent (Monthly)');
+    proPlan.textContent = planLabel;
     proEmail.textContent = license.email || '—';
+
+    // Video detection status
+    if (videoStatusBox && videoUpgradeHint) {
+      if (hasVideo) {
+        videoStatusBox.style.display = 'block';
+        videoUpgradeHint.style.display = 'none';
+        if (videoTokenBalance) {
+          videoTokenBalance.textContent = license.tokensRemaining != null
+            ? `${license.tokensRemaining} tokens`
+            : '—';
+        }
+      } else {
+        videoStatusBox.style.display = 'none';
+        videoUpgradeHint.style.display = 'block';
+      }
+    }
 
     if (license.expiresAt) {
       const expiresDate = new Date(license.expiresAt);
