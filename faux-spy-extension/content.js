@@ -992,7 +992,10 @@ function applyHighlight(img, result) {
     badge.appendChild(iconSpan);
     badge.appendChild(textSpan);
     
-    badge.title = `${confidence.description}\n\nAI Probability: ${percentage}%\nSensitivity: ${state.sensitivity}\nThreshold: ${CONFIG.thresholds[state.sensitivity] * 100}%\nMethod: ${result.method || 'unknown'}\nClick for details`;
+    const communityLine = result.communitySightings
+      ? `\n\n👥 Checked by ${result.communitySightings - 1} other ${result.communitySightings - 1 === 1 ? 'person' : 'people'} — same verdict`
+      : '';
+    badge.title = `${confidence.description}\n\nAI Probability: ${percentage}%\nSensitivity: ${state.sensitivity}\nThreshold: ${CONFIG.thresholds[state.sensitivity] * 100}%\nMethod: ${result.method || 'unknown'}${communityLine}\nClick for details`;
     
     badge.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1765,6 +1768,10 @@ function showVideoResultPanel(video, result) {
         <span class="ai-verdict-icon">${icon}</span>
         <span class="ai-verdict-label">${escapeHtml(result.verdictLabel)}</span>
       </div>
+      ${result.communitySightings ? `
+      <div class="ai-community-banner" style="margin-bottom:12px;padding:8px 12px;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.35);border-radius:8px;font-size:12px;color:#c4b5fd;text-align:center;">
+        👥 Checked by ${result.communitySightings - 1} other ${result.communitySightings - 1 === 1 ? 'person' : 'people'} — same verdict
+      </div>` : ''}
       <div class="ai-panel-details">
         <div class="ai-detail-row"><span>AI Score:</span><span>${scorePercent}%</span></div>
         <div class="ai-detail-row"><span>Frames analyzed:</span><span>${result.framesAnalyzed || '—'}</span></div>
@@ -2334,6 +2341,10 @@ function showAnimatedResultPanel(img, result) {
       <div style="margin-top:6px;font-size:11px;color:#94a3b8;text-align:center;padding:0 8px;">
         ⚠️ No detector is 100% accurate — treat as one signal, not a final verdict
       </div>
+      ${result.communitySightings ? `
+      <div class="ai-community-banner" style="margin-top:8px;padding:8px 12px;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.35);border-radius:8px;font-size:12px;color:#c4b5fd;text-align:center;">
+        👥 Checked by ${result.communitySightings - 1} other ${result.communitySightings - 1 === 1 ? 'person' : 'people'} — same verdict
+      </div>` : ''}
 
       <div class="ai-panel-details">
         <div class="ai-detail-row">
