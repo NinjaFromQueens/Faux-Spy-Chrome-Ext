@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.9.3",
-  "description": "Right-click any photo to find out if it's real or AI-generated. Works on Instagram, Pinterest, X, and anywhere else.",
+  "version": "1.9.6",
+  "description": "Right-click any image to instantly detect if it's AI-generated or real. Free, no account required.",
   "browser_specific_settings": {
     "gecko": {
       "id": "fauxspy@fauxspy.com",

@@ -264,6 +264,9 @@ let lastRequestTime = 0;
 
 // v1.6: Backend proxy URL - hides Sightengine API key from users
 const BACKEND_URL = 'https://www.fauxspy.com';
+// Image scans normally finish in a few seconds; the backend itself gives up
+// on slow providers well before this.
+const DETECT_TIMEOUT_MS = 25000;
 
 // Create context menu
 chrome.runtime.onInstalled.addListener(() => {
@@ -323,15 +326,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-/**
- * Legacy checkLicense function - kept as no-op for compatibility
- * Real license logic is in license.js (loaded via importScripts in service worker)
- */
+// License logic lives in license.js (loaded above). A browser restart is a
+// natural point to re-check a stale Pro license.
+chrome.runtime.onStartup.addListener(() => {
+  getLicense().catch(() => {});
+});
+
 async function checkLicense() {
-  // No-op - license.js handles this now
-  // Kept to prevent errors from old code paths
-  const { license } = await chrome.storage.local.get('license');
-  return license || { isPro: false, plan: 'free', limits: { scansPerDay: 3 } };
+  return getLicense();
 }
 
 // Listen for messages from content script
@@ -389,10 +391,21 @@ async function analyzeVideo(request, callback) {
         }),
         signal: controller.signal
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      result = await response.json();
+      // Read the body even on 4xx: it carries the reason (TOKENS_EXHAUSTED,
+      // LICENSE_EXPIRED, VIDEO_FEATURE_REQUIRED...) that the page shows.
+      let body = null;
+      try { body = await response.json(); } catch { /* non-JSON error page */ }
+      result = response.ok || body?.error
+        ? body
+        : { error: 'INTERNAL_ERROR', message: `Video service error (HTTP ${response.status})` };
     } finally {
       clearTimeout(timeoutId);
+    }
+
+    // The server says the license itself is no longer valid — re-check so
+    // the extension stops showing Pro.
+    if (['INVALID_LICENSE', 'LICENSE_INACTIVE', 'LICENSE_EXPIRED'].includes(result?.error)) {
+      revalidateLicense().catch(() => {});
     }
 
     // Sync token balance from server response (authoritative)
@@ -539,14 +552,11 @@ async function processAnalysis(request) {
     return cachedResult;
   }
 
-  // v1.5: Try Faux Spy proxy backend FIRST (uses our Sightengine key)
-  // Falls back to user's own Sightengine credentials if proxy fails
-  // Final fallback: heuristic
-
   let license;
   try {
-    const stored = await chrome.storage.local.get(['license']);
-    license = stored.license;
+    // getLicense() re-checks a Pro license with the server once a day, so a
+    // cancelled or refunded subscription stops showing as Pro.
+    license = await getLicense();
   } catch (_ctxErr) {
     license = null; // extension context may be stale; proceed as free tier
   }
@@ -571,33 +581,20 @@ async function processAnalysis(request) {
     }
   }
 
-  // STEP 1: Try Faux Spy proxy backend
+  // STEP 1: Faux Spy backend
   log('🎯 [FAUXSPY] Calling backend proxy...');
   const proxyResult = await analyzeWithProxy(imageData, license);
 
-  if (proxyResult.method === 'sightengine_api') {
-    log('✅ [FAUXSPY] Backend detection succeeded');
+  if (!proxyResult.error) {
     incrementStat('total');
-    incrementStat('apiCalls');
-    return proxyResult;
+    if (proxyResult.method === 'sightengine_api') incrementStat('apiCalls');
   }
 
-  // If proxy hit daily limit, return that specific result (don't fall back)
-  if (proxyResult.error === 'DAILY_LIMIT_REACHED') {
-    log('🚫 [FAUXSPY] Daily limit reached');
-    return proxyResult;
-  }
-
-  // STEP 2: Last resort - heuristic
-  log('⚠️ Using heuristic fallback');
-  const heuristicResult = await analyzeImageHeuristic(imageData);
-  heuristicResult.fallback = true;
-  const platformName = getPlatformDisplayName(imageData.pageHost || '');
-  const unavailableMsg = platformName
-    ? `⚠️ Detection service temporarily unavailable on ${platformName}`
-    : '⚠️ Detection service temporarily unavailable';
-  heuristicResult.indicators.unshift(unavailableMsg);
-  return heuristicResult;
+  // Failures go back to the page as errors (out of tokens, daily limit,
+  // offline, timeout...) so it can say what happened. Never substitute a
+  // guessed verdict: a "No AI Detected" badge on a photo nobody checked is
+  // worse than no answer for someone deciding whether a profile is real.
+  return proxyResult;
 }
 
 /**
@@ -625,17 +622,22 @@ async function analyzeWithProxy(imageData, license) {
     const src = imageData.src;
     if (!src || src.startsWith('blob:') ||
         (!src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://'))) {
+      const message = "This image can't be scanned — it has no direct URL";
       return {
         method: 'error',
         error: 'UNSCANNABLE_URL',
         verdict: 'error',
-        indicators: ["This image can't be scanned — it has no direct URL"]
+        message,
+        indicators: [message]
       };
     }
 
     const isFrameCapture = imageData.src?.startsWith('data:');
     const response = await fetch(`${BACKEND_URL}/api/detect`, {
       method: 'POST',
+      // Scans run one at a time (processQueue), so a hung request would block
+      // every later scan in every tab.
+      signal: AbortSignal.timeout(DETECT_TIMEOUT_MS),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         // Video frame captures send base64 data; normal images send a URL
@@ -660,10 +662,17 @@ async function analyzeWithProxy(imageData, license) {
       return {
         method: 'error',
         error: 'PARSE_ERROR',
+        message: 'Invalid response from detection service',
         indicators: ['Invalid response from detection service']
       };
     }
-    
+
+    // The server refused this license as Pro (cancelled, expired, unknown).
+    // Re-check now so the extension drops to the free tier straight away.
+    if (data.proDenied && typeof revalidateLicense === 'function') {
+      revalidateLicense().catch(() => {});
+    }
+
     // Daily limit reached - special handling
     if (response.status === 429 || data.error === 'DAILY_LIMIT_REACHED') {
       const limit = data.limit || 3;
@@ -674,8 +683,9 @@ async function analyzeWithProxy(imageData, license) {
         indicators: [
           '🔒 Daily limit reached',
           `Used ${data.used || limit} of ${limit} free investigations today`,
-          '👉 Upgrade to Pro for unlimited'
+          '👉 Upgrade to Pro for 200 scans a month'
         ],
+        message: `You've used all ${limit} free scans for today. Upgrade to Pro for 200 scans a month.`,
         method: 'error',
         error: 'DAILY_LIMIT_REACHED',
         upgradeUrl: data.upgradeUrl || 'https://www.fauxspy.com/pro',
@@ -693,6 +703,7 @@ async function analyzeWithProxy(imageData, license) {
         aiProbability: 0,
         confidence: 0,
         indicators: ['🔒 Token balance exhausted', 'Purchase more tokens to continue'],
+        message: "You've used all your scans. Buy more tokens to keep scanning.",
         method: 'error',
         error: 'TOKENS_EXHAUSTED',
         buyUrl: data.buyUrl || 'https://www.fauxspy.com/buy-tokens',
@@ -724,6 +735,7 @@ async function analyzeWithProxy(imageData, license) {
       return {
         method: 'error',
         error: data.error || 'PROXY_ERROR',
+        message: userMessage,
         indicators: [userMessage]
       };
     }
@@ -756,22 +768,27 @@ async function analyzeWithProxy(imageData, license) {
     };
     
   } catch (error) {
+    const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError';
     console.error('❌ Proxy call failed:', error);
-    sentryCapture(`Network error: ${error.message}`, {
-      tags: { error_type: 'NETWORK_ERROR', platform: imageData.pageHost || '' },
+    sentryCapture(`${timedOut ? 'Timeout' : 'Network error'}: ${error.message}`, {
+      tags: { error_type: timedOut ? 'DETECTION_TIMEOUT' : 'NETWORK_ERROR', platform: imageData.pageHost || '' },
       extra: { errorDetail: error.message },
       userId
     });
+    if (timedOut) {
+      const message = 'Detection took too long — try again';
+      return { method: 'error', error: 'DETECTION_TIMEOUT', message, indicators: [message] };
+    }
     const platform = getPlatformDisplayName(imageData.pageHost || '');
+    const message = platform
+      ? `Could not reach Faux Spy on ${platform} — check your connection`
+      : 'Could not reach Faux Spy — check your connection';
     return {
       method: 'error',
       error: 'NETWORK_ERROR',
       errorDetail: error.message,
-      indicators: [
-        platform
-          ? `Could not reach Faux Spy on ${platform} — check your connection`
-          : 'Backend unavailable — check your connection'
-      ]
+      message,
+      indicators: [message]
     };
   }
 }
@@ -841,283 +858,6 @@ async function incrementStat(statName) {
     await chrome.storage.local.set({ apiStats: currentStats });
   } catch (error) {
     console.error('Stats update error:', error);
-  }
-}
-
-/**
- * Fallback heuristic detection (used if Hive API fails)
- */
-async function analyzeImageHeuristic({ src, width, height, pageUrl, pageHost, pageTitle }) {
-  try {
-    if (!src) {
-      return { isAI: false, aiProbability: 0.25, confidence: 0.25, indicators: ['No image URL available'], method: 'heuristic' };
-    }
-    const indicators = [];
-    let aiScore = 0;
-    
-    // Check 0: Page context (NEW!) - is the page itself AI-related?
-    if (pageHost) {
-      const aiPageHosts = [
-        'cgdream.ai', 'postcrest.com', 'midjourney.com', 'stability.ai',
-        'lexica.art', 'civitai.com', 'leonardo.ai', 'playgroundai.com',
-        'nightcafe.studio', 'starryai.com', 'novelai.net', 'waifulabs.com',
-        'thispersondoesnotexist.com', 'generated.photos', 'replicate.com',
-        'huggingface.co', 'tensor.art', 'mage.space', 'dreamstudio.ai',
-        'runwayml.com', 'getimg.ai', 'flux.ai', 'recraft.ai', 'krea.ai',
-        'magnific.ai', 'ideogram.ai', 'imagine.art', 'imagine.ai',
-        'dezgo.com', 'gencraft.com', 'instantart.io', 'dreamlike.art',
-        'firefly.adobe.com', 'pngtree.com'
-      ];
-      
-      for (const host of aiPageHosts) {
-        if (pageHost.includes(host)) {
-          indicators.push(`AI website: ${host}`);
-          aiScore += 0.7; // Big boost for being on AI site
-          break;
-        }
-      }
-      
-      // Check page title for AI keywords
-      if (pageTitle) {
-        const titleLower = pageTitle.toLowerCase();
-        if (titleLower.includes('ai-generated') || titleLower.includes('ai generated') ||
-            titleLower.includes('ai art') || titleLower.includes('ai image') ||
-            titleLower.includes('midjourney') || titleLower.includes('stable diffusion') ||
-            titleLower.includes('dall-e') || titleLower.includes('dalle')) {
-          indicators.push('AI keywords in page title');
-          aiScore += 0.4;
-        }
-      }
-      
-      // Check URL path
-      if (pageUrl) {
-        const urlLower = pageUrl.toLowerCase();
-        if (urlLower.includes('/ai/') || urlLower.includes('/ai-') ||
-            urlLower.includes('-ai-') || urlLower.includes('?ai=') ||
-            urlLower.includes('=ai&') || urlLower.includes('=ai/')) {
-          indicators.push('AI keywords in page URL');
-          aiScore += 0.3;
-        }
-      }
-    }
-    
-    // Check 1: Known AI generator domains (EXPANDED LIST)
-    const aiDomains = [
-      // Major AI image platforms
-      'midjourney', 'stability.ai', 'stablediffusion', 'dreamstudio',
-      'dalle', 'openai', 'lexica.art', 'civitai', 'nightcafe',
-      'artbreeder', 'craiyon', 'bluewillow', 'leonardo.ai',
-      'playground.ai', 'playgroundai', 'tensor.art', 'mage.space',
-      // More AI sites
-      'cgdream.ai', 'cgdream', 'postcrest', 'novelai', 'waifulabs',
-      'thispersondoesnotexist', 'generated.photos', 'gencraft',
-      'prodia.com', 'starryai', 'jasper.ai', 'runwayml', 'runway.ml',
-      'firefly.adobe', 'picsart.com', 'fotor.com', 'deepai.org',
-      'pixray', 'wombo.art', 'dream.ai', 'replicate.com',
-      'hotpot.ai', 'imgcreator.zmo.ai', 'imgcreator', 'getimg.ai',
-      'getimg', 'kreator.ai', 'pebblely', 'drawanyone',
-      'tome.app', 'nightbot', 'kapwing.com/ai', 'easy-peasy.ai',
-      'photoroom.com/tools/background-generator', 'ideogram.ai',
-      'flux.ai', 'recraft.ai', 'krea.ai', 'magnific.ai',
-      // Stock with AI categories
-      'shutterstock.com/ai', 'gettyimages.com/ai', 'adobe.com/firefly',
-      // AI training data sources
-      'huggingface.co', 'kaggle.com/datasets',
-      // More specific AI sites
-      'aiimagegenerator', 'ai-image', 'ai-generator', 'aiphotostock',
-      'pngtree.com/free-png-vectors/ai', 'dreamlike.art', 'dreamlike',
-      'instantart.io', 'starnyx.ai', 'mageai', 'gencraft.com',
-      'aiartshop', 'aiart', 'dezgo.com', 'imagine.art', 'imagine.ai'
-    ];
-    
-    const urlLower = src.toLowerCase();
-    let matchedDomain = null;
-    for (const domain of aiDomains) {
-      if (urlLower.includes(domain)) {
-        matchedDomain = domain;
-        indicators.push(`Known AI platform: ${domain}`);
-        aiScore += 0.85; // Very high confidence
-        break;
-      }
-    }
-    
-    // Check 2: AI-related URL/path patterns (EXPANDED)
-    const aiPatterns = [
-      /seed[_-]?\d+/i,
-      /prompt[_-]/i,
-      /(txt|img)2(img|txt)/i,
-      /stable[_-]?diffusion/i,
-      /midjourney/i,
-      /ai[_-]?(art|generated|gen|image)/i,
-      /generated[_-]?image/i,
-      /\d{10,}_\d+\.png/i,           // AI timestamp format
-      /\/ai\//i,                       // /ai/ path
-      /\/generated\//i,                // /generated/ path
-      /\/dalle/i,
-      /\/stable[_-]?diffusion/i,
-      /\/flux/i,
-      /\/midjourney/i,
-      /[?&]model=(stable|flux|dall|midjourney|sdxl)/i,
-      /[?&]prompt=/i,
-      /-ai-/i,                         // -ai- in URL
-      /[_-]flux[_-]/i,
-      /[_-]sd[_-]/i,                   // SD = Stable Diffusion
-      /[_-]sdxl[_-]/i,
-      /artificial[_-]?intelligence/i,
-      /neural[_-]?network/i,
-      /machine[_-]?learning/i,
-      /diffusion[_-]?model/i
-    ];
-    
-    let patternMatches = 0;
-    for (const pattern of aiPatterns) {
-      if (pattern.test(src)) {
-        patternMatches++;
-        indicators.push('AI URL pattern detected');
-        aiScore += 0.3;
-        if (patternMatches >= 2) break; // Cap at 2 patterns
-      }
-    }
-    
-    // Check 3: Exact AI generation dimensions (more dimensions)
-    if (width && height) {
-      const commonAIDimensions = [
-        [512, 512], [768, 768], [1024, 1024], [2048, 2048],
-        [512, 768], [768, 512], [832, 1216], [1216, 832],
-        [512, 1024], [1024, 512],
-        [768, 1024], [1024, 768], [1280, 1280],
-        [1152, 896], [896, 1152],
-        [1216, 1216], [1408, 1408],
-        [1344, 768], [768, 1344], [1536, 640], [640, 1536],
-        [832, 1248], [1248, 832] // CGDream/Flux dimensions
-      ];
-      
-      const isAIDimension = commonAIDimensions.some(
-        ([w, h]) => (width === w && height === h) || (width === h && height === w)
-      );
-      
-      if (isAIDimension) {
-        indicators.push(`AI generation size (${width}x${height})`);
-        aiScore += 0.4;
-      }
-      
-      // Square images are MORE likely AI
-      if (width === height && width >= 512) {
-        if (!isAIDimension) {
-          indicators.push('Square AI-typical dimensions');
-          aiScore += 0.2;
-        }
-      }
-    }
-    
-    // Check 4: AI-related keywords in URL parameters
-    const aiKeywords = ['ai', 'gpt', 'gan', 'vae', 'diffusion', 'generated', 'synthesis'];
-    const urlPath = urlLower.split('?')[0];
-    let keywordMatches = 0;
-    for (const keyword of aiKeywords) {
-      if (urlPath.includes(`/${keyword}/`) || urlPath.includes(`-${keyword}-`)) {
-        keywordMatches++;
-      }
-    }
-    if (keywordMatches > 0) {
-      indicators.push(`AI keywords in URL`);
-      aiScore += 0.2 * keywordMatches;
-    }
-    
-    // Check 5: Page context - is current page likely AI-related?
-    // We do this in content script via referrer
-    
-    // Calculate final confidence
-    let confidence = Math.min(aiScore, 0.95); // Cap at 95% for heuristic
-    
-    // v1.2: HONEST heuristic confidence calibration
-    // Heuristic should NEVER claim AI without strong proof
-    // Default to "Likely Real" when uncertain
-    
-    if (indicators.length === 0) {
-      // No AI markers found at all - this is likely a real image
-      indicators.push('No AI markers detected');
-      indicators.push('Heuristic-only analysis (limited accuracy)');
-      // Stay well under "Possibly AI" threshold (40%)
-      // 25% = "Likely Real" verdict
-      confidence = 0.25;
-    } else if (matchedDomain) {
-      // STRONG signal: image is hosted on a known AI generator domain
-      // This is one of the few cases where heuristic can be confident
-      confidence = Math.max(confidence, 0.85);
-    } else if (aiScore >= 0.5 && indicators.length >= 2) {
-      // Multiple AI indicators present - moderate confidence
-      // Cap at 60% even with multiple signals (only API can be more confident)
-      confidence = Math.min(confidence, 0.60);
-    } else if (indicators.length === 1) {
-      // Single weak signal - very uncertain
-      // Cap at "Inconclusive" (40-45%)
-      confidence = Math.min(confidence, 0.40);
-    } else {
-      // Some signals but not strong - be conservative
-      // Heuristic shouldn't claim AI without strong evidence
-      confidence = Math.min(confidence, 0.50);
-    }
-    
-    // v1.2: HARD CAP at 0.85 for heuristic (never claim "Definitely AI")
-    // Only API-verified results can score higher
-    confidence = Math.min(confidence, 0.85);
-    
-    // Determine if AI - using new thresholds
-    // Below 0.40 = Real
-    // 0.40 - 0.60 = Inconclusive (NOT AI)
-    // Above 0.60 = AI (only with strong heuristic signals)
-    const isAI = confidence >= 0.60;
-    
-    // Add transparency note about heuristic uncertainty
-    if (confidence >= 0.40 && confidence < 0.60) {
-      indicators.push('⚠️ Inconclusive — detection service temporarily unavailable');
-    } else if (confidence < 0.40) {
-      indicators.push('Heuristic-only analysis — detection service temporarily unavailable');
-    }
-    
-    log(`🔍 [HEURISTIC] Final score: ${(confidence * 100).toFixed(1)}%`);
-    log(`🔍 [HEURISTIC] Verdict: ${isAI ? 'AI' : (confidence >= 0.40 ? 'Inconclusive' : 'Real')}`);
-    log(`🔍 [HEURISTIC] Indicators:`, indicators);
-    
-    return {
-      isAI: isAI,
-      aiProbability: confidence,
-      confidence: confidence,
-      indicators: indicators,
-      method: 'heuristic',
-      // v1.2: Always warn about heuristic limitations
-      warning: 'Heuristic-only detection (limited accuracy). Detection service temporarily unavailable — try again shortly.'
-    };
-    
-  } catch (error) {
-    console.error('Error analyzing image:', error);
-    return {
-      isAI: false,
-      aiProbability: 0,
-      confidence: 0,
-      indicators: ['Analysis failed'],
-      error: 'INTERNAL_ERROR'
-    };
-  }
-}
-
-// Helper function to fetch image and analyze locally
-async function fetchAndAnalyzeImage(imageUrl) {
-  try {
-    const response = await fetch(imageUrl);
-    const blob = await response.blob();
-    
-    // Convert to base64 for analysis
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error('Error fetching image:', error);
-    return null;
   }
 }
 

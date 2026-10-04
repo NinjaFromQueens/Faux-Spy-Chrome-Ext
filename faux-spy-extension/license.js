@@ -1,14 +1,24 @@
 // License Management Module v1.6
+// Handles license activation, validation, and Pro status
+// Connects to fauxspy.com/api/validate-license
+//
+// Wrapped in an IIFE: this file shares one global scope with background.js
+// (importScripts in Chrome, background.scripts in Firefox), and both declare
+// DEBUG / log / BACKEND_URL. Top-level consts here made the file throw on
+// load in Chrome and broke background.js outright in Firefox.
+(() => {
 
 const DEBUG = false;
 const log = (...a) => { if (DEBUG) console.log(...a); };
-// Handles license activation, validation, and Pro status
-// Connects to fauxspy.com/api/validate-license
 
 const BACKEND_URL = 'https://www.fauxspy.com';
 
 // Re-validate license every 24 hours to catch cancellations
 const LICENSE_RECHECK_INTERVAL = 24 * 60 * 60 * 1000;
+// If the check itself fails (offline, server down), try again in an hour
+// rather than on every scan.
+const LICENSE_RETRY_AFTER_FAILURE = 60 * 60 * 1000;
+const VALIDATE_TIMEOUT_MS = 8000;
 
 // ============================================================================
 // LICENSE ACTIVATION (when user enters key in settings)
@@ -133,11 +143,16 @@ async function revalidateLicense() {
     const response = await fetch(`${BACKEND_URL}/api/validate-license`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: license.key })
+      body: JSON.stringify({ licenseKey: license.key }),
+      signal: AbortSignal.timeout(VALIDATE_TIMEOUT_MS)
     });
-    
+
     const data = await response.json();
-    
+
+    // A 5xx also returns valid:false ("Validation failed"). That's the server
+    // having a bad moment, not the license being revoked — keep Pro.
+    if (response.status >= 500) throw new Error(`validate-license HTTP ${response.status}`);
+
     if (!data.valid) {
       // License became invalid — revert to free
       console.warn('⚠️ License no longer valid:', data.error);
@@ -170,9 +185,12 @@ async function revalidateLicense() {
     return updatedLicense;
     
   } catch (error) {
-    // Network error — keep using cached license but don't update timestamp
-    // This way we'll retry next time, and license stays usable offline
+    // Network/server error — keep using the cached license, and back-date the
+    // check so the next attempt is in an hour instead of on every scan.
     console.warn('⚠️ Could not revalidate (offline?):', error.message);
+    await chrome.storage.local.set({
+      lastLicenseCheck: Date.now() - LICENSE_RECHECK_INTERVAL + LICENSE_RETRY_AFTER_FAILURE
+    });
     return license;
   }
 }
@@ -351,3 +369,5 @@ if (typeof self !== 'undefined') {
   self.decrementTokenBalance = decrementTokenBalance;
   self.syncTokenBalance = syncTokenBalance;
 }
+
+})();

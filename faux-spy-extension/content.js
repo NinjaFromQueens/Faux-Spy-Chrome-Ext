@@ -781,14 +781,18 @@ async function scanImage(img) {
     
     if (result && !result.error) {
       applyHighlight(img, result);
-      await incrementDailyScans();
-      updateSessionStats(result);
-      
-      // v8.1: Update stats and check achievements
-      updateStats(result);
+      // "Image too small" isn't a verdict: the server doesn't charge for it,
+      // so it doesn't count toward the daily limit, stats or Case Files.
+      if (result.category !== 'insufficient_data') {
+        await incrementDailyScans();
+        updateSessionStats(result);
 
-      // Save to Case Files (Pro users only)
-      saveToCaseFiles(img, result);
+        // v8.1: Update stats and check achievements
+        updateStats(result);
+
+        // Save to Case Files (Pro users only)
+        saveToCaseFiles(img, result);
+      }
 
       // v8.1: Show animated result panel if enabled
       if (state.showResultPanel && state.scanMode === 'detective') {
@@ -819,7 +823,7 @@ async function scanImage(img) {
     } else {
       state.scannedImages.delete(bestUrl); // allow retry on error
       console.error('❌ Scan failed:', result);
-      showError(img, result?.error || 'INTERNAL_ERROR');
+      showError(img, result?.error || 'INTERNAL_ERROR', result?.message);
     }
   } catch (error) {
     state.scannedImages.delete(bestUrl); // allow retry on exception
@@ -1008,9 +1012,9 @@ function applyHighlight(img, result) {
   }
 }
 
-function showError(img, message) {
+function showError(img, code, detail) {
   if (!img || img._isVirtual || !img.parentNode) {
-    console.warn('Error:', message);
+    console.warn('Error:', code, detail || '');
     return;
   }
 
@@ -1018,12 +1022,14 @@ function showError(img, message) {
     const wrapper = getOrCreateWrapper(img);
     const badge = document.createElement('div');
     badge.className = 'ai-badge ai-badge-error';
-    badge.title = message;
-    const label = message === 'UNSCANNABLE_URL' ? 'Can\'t scan'
-      : message === 'PROXY_ERROR' ? 'Blocked'
-      : message === 'SERVICE_UNAVAILABLE' ? 'Unavailable'
-      : message === 'INTERNAL_ERROR' ? 'Try again'
-      : 'Error';
+    badge.title = detail || code;
+    const label = code === 'UNSCANNABLE_URL' ? 'Can\'t scan'
+      : code === 'PROXY_ERROR' ? 'Blocked'
+      : code === 'SERVICE_UNAVAILABLE' || code === 'SERVICE_BUSY' ? 'Unavailable'
+      : code === 'NETWORK_ERROR' ? 'Offline?'
+      : code === 'DETECTION_TIMEOUT' ? 'Timed out'
+      : code === 'INTERNAL_ERROR' ? 'Try again'
+      : 'Not checked';
     badge.innerHTML = `
       <span>⚠️</span>
       <span>${label}</span>
@@ -1617,7 +1623,7 @@ async function scanVideo(video) {
           showVideoMessage(video, {
             icon: '🔒',
             title: 'Daily Limit Reached',
-            body: 'Upgrade to Pro for unlimited scans.',
+            body: 'Upgrade to Pro for 200 scans a month.',
             linkUrl: 'https://www.fauxspy.com/pro',
             linkLabel: 'Upgrade to Pro →',
             color: 'orange'
@@ -2162,10 +2168,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'showContextResult') {
     removeLoadingBadge(null);
-    if (request.result && !request.result.error) {
-      showAnimatedResultPanel(null, request.result);
+    const result = request.result;
+    if (result && !result.error) {
+      showAnimatedResultPanel(null, result);
+    } else if (result?.error === 'DAILY_LIMIT_REACHED') {
+      showVideoMessage(null, {
+        icon: '🔒',
+        title: 'Daily Limit Reached',
+        body: result.message || 'You\'ve used your free scans for today.',
+        linkUrl: 'https://www.fauxspy.com/pro',
+        linkLabel: 'Upgrade to Pro →',
+        color: 'orange'
+      });
+    } else if (result?.error === 'TOKENS_EXHAUSTED') {
+      showVideoMessage(null, {
+        icon: '🔒',
+        title: 'Out of Tokens',
+        body: result.message || 'Buy more tokens to keep scanning.',
+        linkUrl: 'https://www.fauxspy.com/buy-tokens',
+        linkLabel: 'Buy Tokens →',
+        color: 'orange'
+      });
     } else {
-      console.warn('Context scan failed:', request.result?.error);
+      // Say plainly that the image wasn't checked — never leave the user
+      // guessing whether a silent nothing means "looks fine".
+      console.warn('Context scan failed:', result?.error);
+      showVideoMessage(null, {
+        icon: '⚠️',
+        title: 'Image Not Checked',
+        body: result?.message || 'Something went wrong. Try again in a moment.',
+        color: 'grey'
+      });
     }
     sendResponse({ success: true });
     return true;
@@ -2213,7 +2246,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       showVideoMessage(null, {
         icon: '❌',
         title: 'Analysis Failed',
-        body: 'Could not analyze this video. It may use a protected stream or unsupported format.',
+        // The server's message covers expired/inactive licenses and other specific failures.
+        body: request.result?.message || 'Could not analyze this video. It may use a protected stream or unsupported format.',
         color: 'grey'
       });
     }
