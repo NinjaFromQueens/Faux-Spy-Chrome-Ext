@@ -1,69 +1,120 @@
 # Faux Spy — Chrome Web Store Listing Copy
 
-## Extension Name
-Faux Spy - AI Image Detector
-
-## Short Description (132 chars max — also used as manifest.json `description` field)
-Right-click any image to instantly detect if it's AI-generated or real. Free, no account required.
-
-## Detailed Description (paste into CWS Developer Console → Store listing → Description)
-
-Faux Spy is an AI image detector built into your browser. Hover over any photo, click Investigate, and get a verdict in seconds — no uploading, no switching tabs, no extra steps.
-
-HOW IT WORKS
-
-Three ways to check any image:
-• Hover Mode — hover over any image and click the Investigate button that appears
-• Ctrl+Click — hold Ctrl (or ⌘ on Mac) and click any image for an instant result
-• Page Scan — open the Faux Spy popup and check every image on the page at once
-
-You get a confidence score alongside each result. The difference between 94% "Real Photo" and 54% "Real Photo" is meaningful — Faux Spy shows you both so you can judge for yourself.
-
-WHAT IT DETECTS
-
-Faux Spy classifies images into five categories:
-• Real Photo — an authentic photograph
-• AI Photo — photorealistic AI-generated image
-• AI Art — stylized AI-generated artwork
-• Digital Art — CGI, renders, heavily edited photos
-• Inconclusive — ambiguous signal (common with small compressed thumbnails)
-
-Detection covers images from today's leading AI generation tools and updates as new generators emerge.
-
-WHERE IT'S USEFUL
-
-• Dating apps — verify profile photos before you match or message
-• Online marketplaces — check product photos before you buy
-• News and media — confirm whether a photo is authentic before you share it
-• Job recruiting — spot AI-generated headshots in applicant profiles
-• Any website — if you can see an image in Chrome, Faux Spy can check it
-
-AI-generated faces cannot be caught by reverse image search — they are synthetic originals with no prior internet presence. Faux Spy uses pixel-level machine learning to find what your eyes miss.
-
-PRIVACY
-
-We only see the URL of the image you actively click to investigate. No images are stored on our servers. No browsing history is collected. Results stay on your device.
-
-FREE & PRO PLANS
-
-Free (no account required):
-• 3 investigations per day
-• Real Photo, AI Photo, and Inconclusive verdicts
-
-Pro ($9.99/month or $99/year):
-• 200 investigations/month (no daily cap)
-• All 5 detection categories including AI Art and Digital Art
-• Case Files — full history of every image you've investigated
-• Deep Dive mode — finds and checks hidden or lazy-loaded images on the page
-• Priority support
+Source of truth for everything typed into the CWS Developer Dashboard. Keep it
+in sync with what the extension and fauxspy.com/privacy actually do.
 
 ---
 
-## Category
-Productivity
+## Store listing tab
 
-## Language
+### Extension name
+Faux Spy - AI Image Detector
+
+### Summary (≤132 chars — also manifest.json `description`)
+Right-click any image to instantly detect if it's AI-generated or real. Free, no account required.
+
+### Category
+Privacy & Security
+
+### Language
 English (United States)
+
+### Description (paste into Store listing → Description)
+
+Faux Spy checks whether a photo is AI-generated before you trust it. Right-click any image, or hover over it and click Investigate, and get a verdict with a confidence score in a few seconds. There's nothing to upload and no tab to switch to.
+
+AI-generated faces are now common on dating apps and social media, and they're built to look real. Reverse image search can't catch them, because a newly generated face has never appeared online before. Faux Spy analyzes the image itself.
+
+HOW TO CHECK AN IMAGE
+• Right-click any image and choose "Investigate this image"
+• Hover over an image and click the Investigate button
+• Ctrl+click (⌘+click on Mac) any image for an instant check
+• Use Page Scan in the popup to check the images you can see, all at once
+
+WHAT THE VERDICT MEANS
+Every result comes with a confidence score, so a strong 94% result reads differently from a borderline 54% one. Verdicts include AI-generated, real photograph, human-made digital art, and inconclusive (common with small, heavily compressed thumbnails). No detector is perfect, so treat the result as one strong signal alongside other warning signs.
+
+WHERE IT HELPS
+• Dating apps: check a match's photos before you invest time or money
+• Social media and online marketplaces: spot fake profiles and fake product photos
+• News: check a dramatic photo before you share it
+• Hiring: spot AI-generated headshots on applicant profiles
+
+PRIVACY
+Faux Spy only sends the image you choose to scan, along with the website's domain, for analysis. It doesn't collect your browsing history, and the image itself is never stored. Your stats, badges and Case Files stay in your browser. Full details: fauxspy.com/privacy
+
+FREE AND PAID PLANS
+Free, no account needed:
+• 3 scans a day
+• AI, real, digital art and inconclusive verdicts
+
+Secret Agent ($9.99/month) or Master Spy ($99/year):
+• 200 scans a month
+• Separates AI photos from AI art, and flags signs of photo manipulation
+• Case Files: a history of every image you've checked
+• Deep Dive: checks hidden and lazy-loaded images on a page
+
+Pro + Video ($29.99/month):
+• Everything above, plus AI video detection that names the likely generator
+
+Every paid plan has a 14-day money-back guarantee.
+
+### Website / Support
+- Official URL: https://www.fauxspy.com
+- Support URL: https://www.fauxspy.com/contact
+- Contact email: consider hello@fauxspy.com instead of a personal address
+
+### Graphic assets
+Generated by `npm run capture` into `web-store-assets/out/` (see `web-store-assets/HOW-TO-CAPTURE.md`):
+- Screenshots 1–5 (1280×800), small promo tile (440×280), marquee (1400×560)
+- Video: upload `demo.mp4` to YouTube and paste the link
+
+---
+
+## Privacy tab
+
+### Single purpose
+Faux Spy checks whether an image or video on the page you're viewing was generated by AI, and shows the verdict with a confidence score.
+
+### Permission justifications
+- **activeTab**: When the user opens the popup, it reads the current tab's address to show which site Page Scan is tuned for (e.g. "Optimized for Instagram"). Only on user action.
+- **contextMenus**: Adds "Investigate this image" and "Analyze this video" to the right-click menu, the main way users start a scan.
+- **storage**: Stores settings, the free-scan counter, the license key for paid plans, and the user's local stats, badges and Case Files.
+- **Host permission, fauxspy.com**: The extension's own detection API, which receives the image the user chooses to scan and validates paid licenses.
+- **Host permission, Sentry ingest**: Sends error reports when a scan fails (extension version, error type, a random anonymous ID and the type of site, e.g. "Instagram"), so we can fix broken sites.
+- **Content script on all sites**: The hover Investigate button and the right-click and Ctrl+click checks have to work on whatever site the user is on. The content script only sends an image when the user chooses to scan it.
+
+### Remote code
+No, I am not using remote code. (The local AI model downloaded from fauxspy.com is a data file run by the WebAssembly runtime bundled in the package, not code.)
+
+### Data usage — check these
+- **Personally identifiable information**: email address, only for paid plans (license delivery and support).
+- **Authentication information**: the paid-plan license key, stored in the browser and checked against our server.
+- **Location**: IP address, used server-side with the anonymous ID to count free scans; counters expire after 25 hours.
+- **Web history**: only the domain of the page where the user starts a scan (no full addresses, titles or other pages).
+- **Website content**: the address of the image or video the user chooses to scan, or, for a streamed video on Pro + Video, one still frame.
+
+Leave unchecked: Health, Financial and payment information (payments happen on stripe.com, never in the extension), Personal communications, User activity.
+
+### Certifications — check all three
+- I do not sell or transfer user data to third parties, outside of the approved use cases
+- I do not use or transfer user data for purposes that are unrelated to my item's single purpose
+- I do not use or transfer user data to determine creditworthiness or for lending purposes
+
+### Privacy policy URL
+https://www.fauxspy.com/privacy
+
+---
+
+## Featured badge nomination
+Submit after 1.10.0 is live and the listing above is updated:
+https://support.google.com/chrome_webstore/contact/one_stop_support → nominate for the Featured badge.
+
+Suggested text:
+
+> Faux Spy (npdkneknfigfcledlnmedkobcjdcigcg) helps people spot AI-generated photos, the main tool behind fake dating profiles and romance scams. Right-click or hover any image to get a verdict with a confidence score in a few seconds.
+>
+> The core feature is free with no account (3 scans a day). It's Manifest V3 with minimal permissions (activeTab, contextMenus, storage). It sends only the image the user chooses to scan, our privacy disclosures match the extension's behavior, and it exposes no web-accessible resources. Version 1.10.0 adds a first-run onboarding page, keyboard and screen-reader support for its panels, and back/forward-cache-safe behavior. It's covered by unit tests and Puppeteer end-to-end tests. We'd appreciate consideration for the Featured badge.
 
 ---
 
@@ -73,3 +124,4 @@ Do NOT list 5+ AI model names in a row (e.g. "Midjourney, DALL-E, Stable Diffusi
 These were the exact violations that caused the v1.8.0 and v1.9.3 rejections (Violation ref: Yellow Argon).
 Use generic category language: "dating apps", "social media", "job boards", "online marketplaces".
 Mention platforms/generators naturally in prose when relevant, not as dump lists.
+Don't use superlatives ("best", "#1") or claim store status ("Editor's Choice", "Featured") in any copy or image.
