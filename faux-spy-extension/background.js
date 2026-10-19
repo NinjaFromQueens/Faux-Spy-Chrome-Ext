@@ -23,10 +23,14 @@ const IMAGENET_STD = [0.229, 0.224, 0.225];
 
 let _onnxSession = null;
 let _onnxInitPromise = null;
+let _onnxFailedAt = 0;
+const ONNX_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+const ONNX_RETRY_AFTER_MS = 10 * 60 * 1000;
 
 async function initOnnxSession() {
   if (_onnxSession) return _onnxSession;
   if (_onnxInitPromise) return _onnxInitPromise;
+  if (Date.now() - _onnxFailedAt < ONNX_RETRY_AFTER_MS) return null;
   _onnxInitPromise = (async () => {
     try {
       if (typeof ort === 'undefined') return null;
@@ -34,7 +38,7 @@ async function initOnnxSession() {
       const cache = await caches.open(ONNX_CACHE_NAME);
       let modelResp = await cache.match(ONNX_MODEL_URL);
       if (!modelResp) {
-        modelResp = await fetch(ONNX_MODEL_URL);
+        modelResp = await fetch(ONNX_MODEL_URL, { signal: AbortSignal.timeout(ONNX_DOWNLOAD_TIMEOUT_MS) });
         if (!modelResp.ok) throw new Error(`Model fetch ${modelResp.status}`);
         await cache.put(ONNX_MODEL_URL, modelResp.clone());
         log('✅ [ONNX] Model downloaded and cached');
@@ -46,6 +50,7 @@ async function initOnnxSession() {
     } catch (err) {
       console.warn('⚠️ [ONNX] Init failed:', err.message);
       _onnxInitPromise = null;
+      _onnxFailedAt = Date.now();
       return null;
     }
   })();
@@ -199,7 +204,19 @@ function preprocessPixels(pixels) {
 
 async function runLocalInference(url) {
   try {
-    const session = await initOnnxSession();
+    if (typeof ort === 'undefined') return null;
+    let session = _onnxSession;
+    if (!session) {
+      // A cached model loads in a second or two. Downloading it (~50 MB) can
+      // take minutes on a slow connection, so a scan never waits for that:
+      // start the download in the background and use the API this time.
+      const cache = await caches.open(ONNX_CACHE_NAME);
+      if (!(await cache.match(ONNX_MODEL_URL))) {
+        initOnnxSession();
+        return null;
+      }
+      session = await initOnnxSession();
+    }
     if (!session) return null;
     const pixels = await fetchImagePixels(url);
     if (!pixels) return null;
@@ -269,7 +286,18 @@ const BACKEND_URL = 'https://www.fauxspy.com';
 const DETECT_TIMEOUT_MS = 25000;
 
 // Create context menu
-chrome.runtime.onInstalled.addListener(() => {
+// Uninstall survey: one-tap reasons help us find what's broken. Set on every
+// service-worker start so it always carries the current version.
+chrome.runtime.setUninstallURL(
+  `https://www.fauxspy.com/goodbye?v=${encodeURIComponent(chrome.runtime.getManifest().version)}`
+);
+
+chrome.runtime.onInstalled.addListener((details) => {
+  // First install only — never on updates or browser updates.
+  if (details?.reason === 'install') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+  }
+
   chrome.contextMenus.create({
     id: 'checkAI',
     title: '🕵️ Investigate this image',
@@ -535,6 +563,9 @@ function getPlatformDisplayName(host) {
   if (host.includes('reddit') || host.includes('redd.it')) return 'Reddit';
   if (host.includes('tiktok')) return 'TikTok';
   if (host.includes('linkedin') || host.includes('licdn')) return 'LinkedIn';
+  if (host.includes('tinder') || host.includes('gotinder')) return 'Tinder';
+  if (host.includes('bumble')) return 'Bumble';
+  if (host.includes('hinge')) return 'Hinge';
   return null;
 }
 
@@ -728,7 +759,7 @@ async function analyzeWithProxy(imageData, license) {
         userMessage = data.message || 'Detection service unavailable';
       }
       sentryCapture(`Scan failed: ${data.error || 'PROXY_ERROR'}`, {
-        tags: { error_type: data.error || 'PROXY_ERROR', se_code: String(data.seCode || ''), platform: imageData.pageHost || '' },
+        tags: { error_type: data.error || 'PROXY_ERROR', se_code: String(data.seCode || ''), platform: getPlatformDisplayName(imageData.pageHost) || 'other' },
         extra: { message: data.message, seCode: data.seCode },
         userId
       });
@@ -771,7 +802,7 @@ async function analyzeWithProxy(imageData, license) {
     const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError';
     console.error('❌ Proxy call failed:', error);
     sentryCapture(`${timedOut ? 'Timeout' : 'Network error'}: ${error.message}`, {
-      tags: { error_type: timedOut ? 'DETECTION_TIMEOUT' : 'NETWORK_ERROR', platform: imageData.pageHost || '' },
+      tags: { error_type: timedOut ? 'DETECTION_TIMEOUT' : 'NETWORK_ERROR', platform: getPlatformDisplayName(imageData.pageHost) || 'other' },
       extra: { errorDetail: error.message },
       userId
     });

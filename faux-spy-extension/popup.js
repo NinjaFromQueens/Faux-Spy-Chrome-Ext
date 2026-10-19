@@ -377,9 +377,13 @@ async function init() {
         }
       }
       
-      // Update UI
-      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      // Update UI (aria-pressed tells screen readers which mode is on)
+      document.querySelectorAll('.mode-btn').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       
       // Save and notify
       await chrome.storage.local.set({ scanMode: mode });
@@ -396,11 +400,11 @@ async function init() {
   
   // Load saved mode
   const { scanMode } = await chrome.storage.local.get('scanMode');
-  if (scanMode) {
-    document.querySelectorAll('.mode-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.mode === scanMode);
-    });
-  }
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    const on = scanMode ? b.dataset.mode === scanMode : b.classList.contains('active');
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
   
   // Load data in parallel
   const [licenseData, stats, achievements] = await Promise.all([
@@ -435,6 +439,11 @@ async function init() {
 // START
 // ============================================================================
 
+document.addEventListener('DOMContentLoaded', () => {
+  // Read the version from the manifest so the footer can't go stale.
+  const footer = document.getElementById('footerVersion');
+  if (footer) footer.textContent = `Faux Spy v${chrome.runtime.getManifest().version}`;
+});
 document.addEventListener('DOMContentLoaded', init);
 
 // ============================================================================

@@ -16,7 +16,6 @@ const CONFIG = {
   minImageSize: 100,
   hoverDelay: 500,
   maxBatchSize: 10,
-  intersectionMargin: '50px',
   throttleWait: 16,
   
   // AI Detection Sensitivity (can be changed in settings)
@@ -175,7 +174,6 @@ function getAllScannableImages() {
 
 const state = {
   scannedImages: new Set(),
-  visibleImages: new WeakSet(),
   hoverTimeout: null,
   hideTimeout: null,
   videoHoverTimeout: null,
@@ -475,7 +473,6 @@ const WidgetPool = {
   isVisible: false,
   currentImage: null,
   _pendingImage: null,  // immune to hide() — persists until scan starts
-  cleanupFns: [],
 
   init() {
     if (this.widget) return this.widget;
@@ -569,14 +566,6 @@ const WidgetPool = {
         z-index: 2147483647;
       `;
     });
-  },
-
-  cleanup() {
-    this.cleanupFns.forEach(fn => fn());
-    this.cleanupFns = [];
-    if (this.widget?.parentNode) {
-      this.widget.remove();
-    }
   }
 };
 
@@ -784,7 +773,9 @@ async function scanImage(img) {
       // "Image too small" isn't a verdict: the server doesn't charge for it,
       // so it doesn't count toward the daily limit, stats or Case Files.
       if (result.category !== 'insufficient_data') {
-        await incrementDailyScans();
+        // A server cache hit (someone already scanned this image) is free on
+        // the server, so it doesn't use one of the user's free scans here either.
+        if (!result.cached) await incrementDailyScans();
         updateSessionStats(result);
 
         // v8.1: Update stats and check achievements
@@ -822,7 +813,9 @@ async function scanImage(img) {
       });
     } else {
       state.scannedImages.delete(bestUrl); // allow retry on error
-      console.error('❌ Scan failed:', result);
+      // Expected outcome (offline, busy, unscannable): the badge says so.
+      // Keep it out of the website's own console.
+      log('❌ Scan failed:', result);
       showError(img, result?.error || 'INTERNAL_ERROR', result?.message);
     }
   } catch (error) {
@@ -1014,7 +1007,7 @@ function applyHighlight(img, result) {
 
 function showError(img, code, detail) {
   if (!img || img._isVirtual || !img.parentNode) {
-    console.warn('Error:', code, detail || '');
+    log('Error:', code, detail || '');
     return;
   }
 
@@ -1738,12 +1731,14 @@ function showVideoMessage(video, { icon, title, body, linkUrl, linkLabel, color 
 
   const panel = document.createElement('div');
   panel.className = `ai-video-message-panel ai-video-msg-${color || 'grey'}`;
+  panel.setAttribute('role', 'alertdialog');
+  panel.setAttribute('aria-label', title || 'Faux Spy message');
   panel.innerHTML = `
-    <button class="ai-panel-close" type="button" style="float:right;background:none;border:none;font-size:18px;cursor:pointer;color:inherit;">×</button>
+    <button class="ai-panel-close" type="button" aria-label="Close" style="float:right;background:none;border:none;font-size:18px;cursor:pointer;color:inherit;">×</button>
     <div style="font-size:1.5rem;margin-bottom:6px;">${icon}</div>
     <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(title)}</div>
     <div style="font-size:0.85rem;opacity:0.85;">${escapeHtml(body)}</div>
-    ${linkUrl ? `<a href="${linkUrl}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:0.85rem;font-weight:600;color:inherit;">${escapeHtml(linkLabel || 'Learn more')}</a>` : ''}
+    ${safeLink(linkUrl) ? `<a href="${escapeHtml(safeLink(linkUrl))}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:0.85rem;font-weight:600;color:inherit;">${escapeHtml(linkLabel || 'Learn more')}</a>` : ''}
   `;
   panel.querySelector('.ai-panel-close').addEventListener('click', () => panel.remove());
   positionVideoPanel(panel, video);
@@ -1764,10 +1759,12 @@ function showVideoResultPanel(video, result) {
 
   const panel = document.createElement('div');
   panel.className = 'ai-video-result-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'Faux Spy video analysis');
   panel.innerHTML = `
     <div class="ai-panel-header">
       <h3>🎬 Faux Spy Video Analysis</h3>
-      <button class="ai-panel-close" type="button">×</button>
+      <button class="ai-panel-close" type="button" aria-label="Close">×</button>
     </div>
     <div class="ai-panel-body">
       <div class="ai-verdict ai-verdict-${color}" style="margin-bottom:12px;">
@@ -1780,9 +1777,9 @@ function showVideoResultPanel(video, result) {
       </div>` : ''}
       <div class="ai-panel-details">
         <div class="ai-detail-row"><span>AI Score:</span><span>${scorePercent}%</span></div>
-        <div class="ai-detail-row"><span>Frames analyzed:</span><span>${result.framesAnalyzed || '—'}</span></div>
+        <div class="ai-detail-row"><span>Frames analyzed:</span><span>${Number(result.framesAnalyzed) || '—'}</span></div>
         ${generatorLine}
-        <div class="ai-detail-row"><span>Tokens used:</span><span>${result.tokensUsed || 10} · Balance: ${result.tokenBalance ?? '—'}</span></div>
+        <div class="ai-detail-row"><span>Tokens used:</span><span>${Number(result.tokensUsed) || 10} · Balance: ${Number.isFinite(result.tokenBalance) ? result.tokenBalance : '—'}</span></div>
       </div>
     </div>
   `;
@@ -2010,38 +2007,8 @@ function setupCtrlClickHandlers() {
 // Setup handlers immediately
 setupCtrlClickHandlers();
 
-// Also re-setup after DOM mutations (Instagram dynamically loads content)
-const ctrlClickObserver = new MutationObserver(() => {
-  // Throttle - don't run too often
-  if (window._ctrlClickSetupTimer) return;
-  window._ctrlClickSetupTimer = setTimeout(() => {
-    window._ctrlClickSetupTimer = null;
-  }, 1000);
-});
-
-ctrlClickObserver.observe(document.body || document.documentElement, {
-  childList: true,
-  subtree: true
-});
-
 window.addEventListener('scroll', updateWidgetPosition, { passive: true });
 window.addEventListener('resize', updateWidgetPosition, { passive: true });
-
-// ============================================================================
-// INTERSECTION OBSERVER
-// ============================================================================
-
-const imageObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      state.visibleImages.add(entry.target);
-      imageObserver.unobserve(entry.target);
-    }
-  });
-}, {
-  rootMargin: CONFIG.intersectionMargin,
-  threshold: 0.01
-});
 
 // ============================================================================
 // INITIALIZATION
@@ -2051,36 +2018,6 @@ function initializeDetector() {
   log('🚀 AI Detector v7.2 - Improved AI Detection');
   log(`🎯 Sensitivity: ${state.sensitivity} (${(CONFIG.thresholds[state.sensitivity] * 100)}% threshold)`);
   log('💡 Hover, Ctrl+Click, or Right-Click to scan');
-  
-  const images = document.querySelectorAll('img');
-  log(`📊 Found ${images.length} images - observing visible ones`);
-  
-  images.forEach(img => {
-    if (isScannableImage(img)) {
-      imageObserver.observe(img);
-    }
-  });
-  
-  const mutationObserver = new MutationObserver((mutations) => {
-    mutations.forEach(mutation => {
-      mutation.addedNodes.forEach(node => {
-        if (node.nodeName === 'IMG' && isScannableImage(node)) {
-          imageObserver.observe(node);
-        } else if (node.querySelectorAll) {
-          node.querySelectorAll('img').forEach(img => {
-            if (isScannableImage(img)) {
-              imageObserver.observe(img);
-            }
-          });
-        }
-      });
-    });
-  });
-  
-  mutationObserver.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
   
   WidgetPool.init();
   log('✅ Initialized - Ready to scan!');
@@ -2192,7 +2129,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       // Say plainly that the image wasn't checked — never leave the user
       // guessing whether a silent nothing means "looks fine".
-      console.warn('Context scan failed:', result?.error);
+      log('Context scan failed:', result?.error);
       showVideoMessage(null, {
         icon: '⚠️',
         title: 'Image Not Checked',
@@ -2242,7 +2179,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.result && !err) {
       showVideoResultPanel(null, request.result);
     } else {
-      console.warn('Video context scan failed:', err);
+      log('Video context scan failed:', err);
       showVideoMessage(null, {
         icon: '❌',
         title: 'Analysis Failed',
@@ -2273,10 +2210,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // CLEANUP
 // ============================================================================
 
-window.addEventListener('beforeunload', () => {
-  WidgetPool.cleanup();
-  imageObserver.disconnect();
-});
+// No unload-time cleanup: the page frees everything when it really unloads,
+// and a beforeunload handler ran even when the user cancelled a site's
+// "leave page?" prompt, leaving the extension broken on that page.
 
 // ============================================================================
 // START
@@ -2295,6 +2231,17 @@ if (document.readyState === 'loading') {
 function escapeHtml(str) {
   if (typeof str !== 'string') return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// Links in our panels can come from server responses (buyUrl, upgradeUrl).
+// Only ever point users at fauxspy.com over HTTPS.
+function safeLink(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && (u.hostname === 'fauxspy.com' || u.hostname === 'www.fauxspy.com') ? u.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function buildExtraIndicators(result) {
@@ -2335,10 +2282,12 @@ function showAnimatedResultPanel(img, result) {
   // Create panel
   const panel = document.createElement('div');
   panel.className = 'ai-result-panel-v8';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'Faux Spy investigation result');
   panel.innerHTML = `
     <div class="ai-panel-header">
       <h3>🕵️ Faux Spy Investigation</h3>
-      <button class="ai-panel-close" type="button">×</button>
+      <button class="ai-panel-close" type="button" aria-label="Close">×</button>
     </div>
     
     <div class="ai-panel-body">
@@ -2370,7 +2319,7 @@ function showAnimatedResultPanel(img, result) {
 
       <div class="ai-verdict ai-verdict-${confidence.color}">
         <span class="ai-verdict-icon">${confidence.icon}</span>
-        <span class="ai-verdict-label">${confidence.label}</span>
+        <span class="ai-verdict-label">${escapeHtml(confidence.label)}</span>
       </div>
       <div style="margin-top:6px;font-size:11px;color:#94a3b8;text-align:center;padding:0 8px;">
         ⚠️ No detector is 100% accurate — treat as one signal, not a final verdict
@@ -2383,7 +2332,7 @@ function showAnimatedResultPanel(img, result) {
       <div class="ai-panel-details">
         <div class="ai-detail-row">
           <span>Confidence:</span>
-          <span>${confidence.description}</span>
+          <span>${escapeHtml(confidence.description)}</span>
         </div>
         ${result.signal || result.trace ? `
         <div class="ai-engines-row">
@@ -2414,7 +2363,7 @@ function showAnimatedResultPanel(img, result) {
         </div>` : `
         <div class="ai-detail-row">
           <span>Method:</span>
-          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : 'api'}">${getMethodLabel(result.method)}</span>
+          <span class="ai-method-${result.method === 'heuristic' ? 'heuristic' : 'api'}">${escapeHtml(getMethodLabel(result.method))}</span>
         </div>`}
         <div class="ai-detail-row">
           <span>Sensitivity:</span>
@@ -2516,9 +2465,59 @@ function showAnimatedResultPanel(img, result) {
   // Share button - pass image URL too
   const shareBtn = panel.querySelector('.ai-action-share');
   if (shareBtn) shareBtn.onclick = () => shareResultV8(result, confidence, imageUrl);
-  
+
+  maybeShowReviewPrompt(panel, result);
+
   // v8.4: Don't auto-close - let user dismiss when ready
   // Auto-close removed since panel can now be dragged
+}
+
+// ============================================================================
+// REVIEW PROMPT — one quiet line in the result panel, after a few real
+// verdicts. No incentive and no gating (store policy); shown at most 3 times
+// and never again once the user clicks it or dismisses it.
+// ============================================================================
+
+const REVIEW_URL = chrome.runtime.getURL('').startsWith('moz-extension:')
+  ? 'https://addons.mozilla.org/firefox/addon/faux-spy-ai-image-detector/reviews/'
+  : / Edg\//.test(navigator.userAgent)
+    ? 'https://microsoftedge.microsoft.com/addons/detail/faux-spy-ai-image-detec/kgahaelogloejdlomjbfpfebecpgmjdh'
+    : 'https://chromewebstore.google.com/detail/faux-spy-ai-image-detecto/npdkneknfigfcledlnmedkobcjdcigcg/reviews';
+const REVIEW_AFTER_VERDICTS = 3;
+const REVIEW_MAX_SHOWS = 3;
+
+async function maybeShowReviewPrompt(panel, result) {
+  if (!result || result.error || result.category === 'insufficient_data') return;
+
+  let verdictCount, reviewPrompt;
+  try {
+    ({ verdictCount, reviewPrompt } = await chrome.storage.local.get(['verdictCount', 'reviewPrompt']));
+  } catch (_ctxErr) { return; }
+
+  verdictCount = (verdictCount || 0) + 1;
+  const prompt = { done: false, shown: 0, ...reviewPrompt };
+  const show = !prompt.done && verdictCount >= REVIEW_AFTER_VERDICTS;
+  if (show) {
+    prompt.shown += 1;
+    if (prompt.shown >= REVIEW_MAX_SHOWS) prompt.done = true;
+  }
+  try { await chrome.storage.local.set({ verdictCount, reviewPrompt: prompt }); } catch (_e) { /* best-effort */ }
+  if (!show || !panel.isConnected) return;
+
+  const row = document.createElement('div');
+  row.className = 'ai-review-prompt';
+  row.innerHTML = `
+    <a href="${REVIEW_URL}" target="_blank" rel="noopener">⭐ Finding Faux Spy useful? Leave a review →</a>
+    <button type="button" class="ai-review-dismiss" aria-label="Don't show this again">×</button>
+  `;
+  const markDone = () => {
+    chrome.storage.local.set({ reviewPrompt: { ...prompt, done: true } }).catch(() => {});
+  };
+  row.querySelector('a').addEventListener('click', markDone);
+  row.querySelector('button').addEventListener('click', () => { markDone(); row.remove(); });
+
+  const actions = panel.querySelector('.ai-panel-actions');
+  if (actions) actions.before(row); else panel.appendChild(row);
 }
 
 // Animate number counter
@@ -2955,9 +2954,16 @@ function onSPANavigate() {
 // popstate fires on browser back/forward on all platforms
 window.addEventListener('popstate', onSPANavigate);
 
-// Interval poll catches pushState navigations on X, Instagram, Pinterest.
-// history.pushState patching is not possible in MV3 isolated worlds.
-setInterval(onSPANavigate, 1000);
+// pushState navigations (X, Instagram, Pinterest) don't fire popstate.
+// history.pushState patching is not possible in MV3 isolated worlds, but the
+// Navigation API reports them without polling every page every second. Fall
+// back to the poll only where the API is missing (older Firefox).
+if (typeof navigation !== 'undefined' && navigation.addEventListener) {
+  // Fires whenever the current history entry changes, including pushState.
+  navigation.addEventListener('currententrychange', onSPANavigate);
+} else {
+  setInterval(onSPANavigate, 1000);
+}
 
 // YouTube fires this custom event after page content loads — faster than the poll
 document.addEventListener('yt-navigate-finish', onSPANavigate);
@@ -2991,6 +2997,15 @@ document.addEventListener('click', (e) => {
 }, true);
 
 // Keyboard-based detection: left/right arrow keys also navigate Instagram carousels
+// Escape closes our panels, like any dialog.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const panels = document.querySelectorAll('.ai-result-panel-v8, .ai-video-result-panel, .ai-video-message-panel');
+  if (!panels.length) return;
+  panels.forEach(p => p.remove());
+  WidgetPool.hide();
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
   if (!document.querySelector('article, [role="dialog"]')) return;

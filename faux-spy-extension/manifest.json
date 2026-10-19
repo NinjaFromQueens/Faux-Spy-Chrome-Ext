@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Faux Spy - AI Image Detector",
-  "version": "1.9.6",
+  "version": "1.10.0",
   "description": "Right-click any image to instantly detect if it's AI-generated or real. Free, no account required.",
   "permissions": [
     "activeTab",
@@ -29,9 +29,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ]
     }
   ],
   "icons": {
@@ -42,15 +48,5 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["upgrade.html", "upgrade.js", "history.html", "history.js"],
-      "matches": ["https://fauxspy.com/*", "https://www.fauxspy.com/*"]
-    },
-    {
-      "resources": ["ort.min.js", "ort-wasm.wasm", "ort-wasm-simd.wasm", "icons/icon512.png"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }
