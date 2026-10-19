@@ -38,9 +38,19 @@ async function initOnnxSession() {
       const cache = await caches.open(ONNX_CACHE_NAME);
       let modelResp = await cache.match(ONNX_MODEL_URL);
       if (!modelResp) {
-        modelResp = await fetch(ONNX_MODEL_URL, { signal: AbortSignal.timeout(ONNX_DOWNLOAD_TIMEOUT_MS) });
-        if (!modelResp.ok) throw new Error(`Model fetch ${modelResp.status}`);
-        await cache.put(ONNX_MODEL_URL, modelResp.clone());
+        // The download now runs after the scan has replied, and Chrome stops
+        // an idle extension service worker after ~30s, which would cut it
+        // off and restart it on every scan. Extension API calls reset that
+        // timer (Chrome's documented pattern for long work), so keep it
+        // alive until the model is cached.
+        const keepAlive = setInterval(() => { chrome.runtime.getPlatformInfo?.(() => {}); }, 20000);
+        try {
+          modelResp = await fetch(ONNX_MODEL_URL, { signal: AbortSignal.timeout(ONNX_DOWNLOAD_TIMEOUT_MS) });
+          if (!modelResp.ok) throw new Error(`Model fetch ${modelResp.status}`);
+          await cache.put(ONNX_MODEL_URL, modelResp.clone());
+        } finally {
+          clearInterval(keepAlive);
+        }
         log('✅ [ONNX] Model downloaded and cached');
       }
       const modelBuf = await modelResp.arrayBuffer();

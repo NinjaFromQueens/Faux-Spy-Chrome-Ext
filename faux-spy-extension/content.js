@@ -2511,7 +2511,9 @@ async function maybeShowReviewPrompt(panel, result) {
     <button type="button" class="ai-review-dismiss" aria-label="Don't show this again">×</button>
   `;
   const markDone = () => {
-    chrome.storage.local.set({ reviewPrompt: { ...prompt, done: true } }).catch(() => {});
+    // Throws synchronously (not a rejected promise) if the extension was
+    // updated while this page stayed open.
+    try { chrome.storage.local.set({ reviewPrompt: { ...prompt, done: true } }).catch(() => {}); } catch (_ctxErr) { /* stale context */ }
   };
   row.querySelector('a').addEventListener('click', markDone);
   row.querySelector('button').addEventListener('click', () => { markDone(); row.remove(); });

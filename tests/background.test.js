@@ -49,7 +49,7 @@ function makeEnv(browser, { ortStub = null } = {}) {
   };
   const ctx = {
     chrome, console: { log() {}, warn() {}, error: (...a) => errors.push(a.map(String).join(' ')) },
-    setTimeout, clearTimeout, Promise, Date, Math, JSON, Error, TypeError, Object, Array, String, Number, Boolean, Map, Set, URL, URLSearchParams,
+    setTimeout, clearTimeout, setInterval, clearInterval, Promise, Date, Math, JSON, Error, TypeError, Object, Array, String, Number, Boolean, Map, Set, URL, URLSearchParams,
     AbortController, DOMException, TextEncoder, btoa, atob, Uint8Array, Float32Array, ArrayBuffer, crypto: globalThis.crypto,
     // Detect timeouts fire fast in tests; everything else unchanged.
     AbortSignal: { timeout: ms => AbortSignal.timeout(ms >= 20000 && ms < 60000 ? 60 : ms) },
@@ -205,6 +205,7 @@ const keepAlive = setInterval(() => {}, 1000);
     const t0 = Date.now();
     const r = await scan(env);
     const ms = Date.now() - t0;
+    await sleep(20); // the background download starts on a later tick
     check('first scan goes straight to the API while the model downloads in background', !r.error && r.verdictLabel === 'No AI Detected' && ms < 1000 && env.fetchLog.some(u => u.includes('ai-detector.onnx')), { ms, r, fetches: env.fetchLog });
   }
 
