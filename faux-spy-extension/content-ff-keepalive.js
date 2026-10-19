@@ -8,6 +8,9 @@
 // port is established before the first analyzeImage message is sent.
 (function () {
   function connect() {
+    // After the extension is updated or disabled, this page's copy of the
+    // script is orphaned: stop instead of retrying every 0.5s forever.
+    if (!chrome.runtime?.id) return;
     try {
       const port = chrome.runtime.connect({ name: 'ff-keepalive' });
       port.onDisconnect.addListener(function () {

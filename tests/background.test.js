@@ -17,7 +17,7 @@ const path = require('path');
 const EXT = process.env.EXT_DIR || path.resolve(__dirname, '..', 'faux-spy-extension');
 const read = f => fs.readFileSync(path.join(EXT, f), 'utf8');
 
-function makeEnv(browser, { ortStub = null } = {}) {
+function makeEnv(browser, { ortStub = null, dataConsent = false } = {}) {
   const storage = {};
   const listeners = { message: [], installed: [], startup: [], changed: [], other: [] };
   const errors = [];
@@ -40,7 +40,7 @@ function makeEnv(browser, { ortStub = null } = {}) {
   const chrome = {
     runtime: {
       onMessage: evt('message'), onInstalled: evt('installed'), onStartup: evt('startup'), onConnect: evt('other'),
-      getURL: p => `chrome-extension://x/${p}`, getManifest: () => manifest,
+      getURL: p => `${browser === 'firefox' ? 'moz-extension' : 'chrome-extension'}://x/${p}`, getManifest: () => manifest,
       setUninstallURL: u => { uninstallUrl = u; }, lastError: null,
     },
     storage: { local, onChanged: evt('changed') },
@@ -57,6 +57,13 @@ function makeEnv(browser, { ortStub = null } = {}) {
     caches: { open: async () => ({ match: async () => undefined, put: async () => {} }) },
     ort: ortStub || undefined,
   };
+  // Firefox built-in data consent: optional technicalAndInteraction permission.
+  if (browser === 'firefox') {
+    ctx.browser = { permissions: {
+      contains: async q => dataConsent && (q.data_collection || []).every(d => d === 'technicalAndInteraction'),
+      onAdded: { addListener() {} }, onRemoved: { addListener() {} },
+    } };
+  }
   ctx.self = ctx;
   vm.createContext(ctx);
   const run = f => vm.runInContext(read(f), ctx, { filename: f });
@@ -221,6 +228,27 @@ const keepAlive = setInterval(() => {}, 1000);
     await scan(env); await sleep(30);
     const all = sentryBodies.join('\n');
     check('error report names the platform ("Tinder"), not the page domain', sentryBodies.length > 0 && all.includes('Tinder') && !all.includes('www.tinder.com'), sentryBodies.map(b => b.slice(0, 200)));
+  }
+
+  // ── Firefox data consent ─────────────────────────────────────────────────
+  {
+    const fx = JSON.parse(read('manifest.firefox.json')).browser_specific_settings.gecko.data_collection_permissions;
+    check('Firefox manifest declares the data it sends (not "none")',
+      !fx.required.includes('none') && ['websiteContent', 'browsingActivity'].every(d => fx.required.includes(d)) && (fx.optional || []).includes('technicalAndInteraction'), fx);
+  }
+  for (const consent of [false, true]) {
+    const env = makeEnv('firefox', { dataConsent: consent });
+    env.load();
+    env.storage.userId = 'fs_test'; env.storage.license = PRO; env.storage.lastLicenseCheck = Date.now();
+    let sent = 0;
+    env.fetchImpl = async u => {
+      if (u.includes('sentry.io')) { sent++; return json(200, {}); }
+      if (u.includes('/api/detect')) return json(500, { error: 'SERVICE_BUSY' });
+      return json(200, {});
+    };
+    await scan(env); await sleep(30);
+    check(consent ? 'Firefox: error report sent once the user allows technical data' : 'Firefox: no error report without the optional technical-data permission',
+      consent ? sent > 0 : sent === 0, { sent });
   }
 
   // ── License re-validation ────────────────────────────────────────────────

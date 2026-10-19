@@ -11,9 +11,32 @@ let _sentryKey, _sentryHost, _sentryProject;
   } catch {}
 })();
 
+// Firefox: error reports are "technical and interaction" data, which Mozilla
+// requires to be optional (manifest data_collection_permissions). Only send
+// them if the user allowed it at install or later in about:addons.
+const _sentryIsFirefox = typeof chrome !== 'undefined' && chrome?.runtime?.getURL?.('').startsWith('moz-extension:');
+let _sentryAllowed = _sentryIsFirefox ? null : true; // null = not checked yet
+
+async function _sentryConsent() {
+  if (_sentryAllowed !== null) return _sentryAllowed;
+  try {
+    _sentryAllowed = await browser.permissions.contains({ data_collection: ['technicalAndInteraction'] });
+  } catch {
+    _sentryAllowed = false; // can't confirm consent, so don't send
+  }
+  return _sentryAllowed;
+}
+
+if (_sentryIsFirefox && typeof browser !== 'undefined' && browser.permissions?.onAdded) {
+  const recheck = () => { _sentryAllowed = null; };
+  browser.permissions.onAdded.addListener(recheck);
+  browser.permissions.onRemoved.addListener(recheck);
+}
+
 async function sentryCapture(message, opts = {}) {
   if (!_sentryKey) return;
   try {
+    if (!(await _sentryConsent())) return;
     const manifest = (typeof chrome !== 'undefined' && chrome?.runtime?.getManifest?.()) || {};
     const payload = {
       event_id: crypto.randomUUID().replace(/-/g, ''),
