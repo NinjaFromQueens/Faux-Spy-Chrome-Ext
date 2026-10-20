@@ -1578,9 +1578,9 @@ async function scanVideo(video) {
     showVideoMessage(video, {
       icon: '🎬',
       title: 'Pro + Video Required',
-      body: 'AI video detection requires the Pro + Video plan. Upgrade to analyze videos on any site.',
+      body: 'AI video detection is part of the Pro + Video plan.',
       linkUrl: 'https://www.fauxspy.com/pro',
-      linkLabel: 'Upgrade to Pro + Video →',
+      linkLabel: 'See Pro + Video →',
       color: 'blue'
     });
     return;
@@ -2161,9 +2161,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       showVideoMessage(null, {
         icon: '🎬',
         title: 'Pro + Video Required',
-        body: 'AI video detection requires the Pro + Video plan.',
+        body: 'AI video detection is part of the Pro + Video plan.',
         linkUrl: 'https://www.fauxspy.com/pro',
-        linkLabel: 'Upgrade to Pro + Video →',
+        linkLabel: 'See Pro + Video →',
         color: 'blue'
       });
     } else if (err === 'TOKENS_EXHAUSTED') {

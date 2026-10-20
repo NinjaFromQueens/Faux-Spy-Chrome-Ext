@@ -154,7 +154,7 @@ const UI = {
           DOM.videoDetectBadge.textContent = 'PRO+VIDEO';
           DOM.videoDetectBadge.classList.remove('badge-active');
         }
-        if (DOM.videoDetectDesc) DOM.videoDetectDesc.textContent = 'Tap to upgrade — $29.99/mo';
+        if (DOM.videoDetectDesc) DOM.videoDetectDesc.textContent = 'Part of Pro + Video — see plans';
       }
     }
   },

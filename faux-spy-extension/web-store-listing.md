@@ -49,15 +49,15 @@ Free, no account needed:
 • AI, real, digital art and inconclusive verdicts
 
 Secret Agent ($9.99/month) or Master Spy ($99/year):
-• 200 scans a month
+• 200 scans a month (2,500 a year on Master Spy)
 • Separates AI photos from AI art, and flags signs of photo manipulation
 • Case Files: a history of every image you've checked
 • Deep Dive: checks hidden and lazy-loaded images on a page
 
-Pro + Video ($29.99/month):
-• Everything above, plus AI video detection that names the likely generator
+Pro + Video (coming soon):
+• Everything above, plus AI video detection
 
-Every paid plan has a 14-day money-back guarantee.
+Every paid plan starts with a 7-day free trial and has a 14-day money-back guarantee.
 
 ### Website / Support
 - Official URL: https://www.fauxspy.com
