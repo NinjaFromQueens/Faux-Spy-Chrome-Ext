@@ -313,12 +313,13 @@ const keepAlive = setInterval(() => {}, 1000);
   // ── Activation (settings page + checkout hand-off) ───────────────────────
   const SETTINGS = { id: 'x', url: 'chrome-extension://x/settings.html' };
   const SUCCESS_TAB = { id: 'x', url: 'https://www.fauxspy.com/success', tab: { url: 'https://www.fauxspy.com/success' } };
-  const validReply = json(200, { valid: true, plan: 'monthly', email: 'a@b.co', expiresAt: 1, tokenBalance: 200, topupBalance: 0, tokensIncluded: 200, features: { videoDetection: false } });
+  const validReply = json(200, { valid: true, plan: 'monthly', email: 'a@b.co', expiresAt: 1, tokenBalance: 200, topupBalance: 0, tokensIncluded: 200, trialEndsAt: 1767225600000, features: { videoDetection: false } });
   {
     const env = freshEnv({ isPro: false, plan: 'free' });
     env.fetchImpl = async () => validReply;
     const r = await env.send({ action: 'activateLicense', key: ' faux-abcd-efgh-jkmn-pqrs ' }, SETTINGS);
     check('settings page activates a key (normalized) and stores Pro', r.success && env.storage.license.isPro && env.storage.license.key === 'FAUX-ABCD-EFGH-JKMN-PQRS' && env.storage.license.tokenBalance === 200, { r, license: env.storage.license });
+    check('activation stores the free-trial end date', env.storage.license.trialEndsAt === 1767225600000, env.storage.license);
   }
   {
     const env = freshEnv({ isPro: false, plan: 'free' });

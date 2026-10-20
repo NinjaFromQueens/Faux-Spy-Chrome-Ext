@@ -14,6 +14,7 @@ Upgrading to Pro
 - Buy Pro on fauxspy.com and it switches on in the extension by itself. No more copying and pasting a license key.
 - Bought a top-up or just renewed? Faux Spy checks with our server before saying you're out of tokens, so new tokens work right away.
 - Settings shows your tokens left, with "Refresh" and "Buy more" links, and a link to get a lost key by email.
+- On a free trial, Settings shows the day the trial ends and your plan starts.
 - Every upgrade prompt now opens the same, current pricing page on fauxspy.com.
 
 Fixes

@@ -29,7 +29,7 @@ const verdict = over => ({
       if (/\/api\/detect(\?|$)/.test(url)) return nextDetectReply;
       if (/\/api\/validate-license$/.test(url)) {
         return body?.licenseKey === TEST_KEY
-          ? { json: { valid: true, isPro: true, plan: 'monthly', email: 'buyer@example.com', expiresAt: Date.now() + 30 * 864e5, tokenBalance: 200, topupBalance: 0, tokensIncluded: 200, features: { videoDetection: false } } }
+          ? { json: { valid: true, isPro: true, plan: 'monthly', email: 'buyer@example.com', expiresAt: Date.now() + 5 * 864e5, trialEndsAt: Date.now() + 5 * 864e5, tokenBalance: 200, topupBalance: 0, tokensIncluded: 200, features: { videoDetection: false } } }
           : { status: 404, json: { valid: false, error: 'License not found', message: 'This license key does not exist. Check for typos.' } };
       }
       return undefined;
@@ -163,6 +163,7 @@ const verdict = over => ({
     await settings.waitForFunction(() => document.getElementById('proTierState').style.display === 'block', { timeout: 5000 }).catch(() => {});
     check('settings: pasted key activates Pro and the page switches to the Pro view',
       (await settings.$eval('#proLicenseDisplay', e => e.textContent)) === TEST_KEY && (await settings.$eval('#proTokenBalance', e => e.textContent)) === '200 tokens');
+    check('settings: shows when the free trial ends', (await settings.$eval('#proExpiresLabel', e => e.textContent)) === 'Free trial ends:');
     check('settings: "Buy more" carries the key to the token page',
       (await settings.$eval('#buyTokensLink', a => a.href)) === `https://www.fauxspy.com/buy-tokens?key=${TEST_KEY}`);
     check('settings page has no console errors', settingsErrors.length === 0, settingsErrors);

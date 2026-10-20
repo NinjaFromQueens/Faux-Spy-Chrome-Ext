@@ -74,6 +74,7 @@ async function activateLicense(licenseKey) {
       plan: data.plan,
       email: data.email,
       expiresAt: data.expiresAt,
+      trialEndsAt: data.trialEndsAt || null,
       activatedAt: Date.now(),
       tokenBalance: data.tokenBalance ?? 0,
       topupBalance: data.topupBalance ?? 0,
@@ -170,6 +171,7 @@ async function revalidateLicense() {
     const updatedLicense = {
       ...license,
       expiresAt: data.expiresAt,
+      trialEndsAt: data.trialEndsAt || null,
       plan: data.plan,
       tokenBalance: data.tokenBalance ?? license.tokenBalance ?? 0,
       topupBalance: data.topupBalance ?? license.topupBalance ?? 0,

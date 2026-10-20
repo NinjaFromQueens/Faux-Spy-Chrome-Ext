@@ -116,15 +116,14 @@ async function refreshLicenseUI() {
       }
     }
 
-    if (license.expiresAt) {
-      const expiresDate = new Date(license.expiresAt);
-      proExpires.textContent = expiresDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+    const longDate = ms => new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const onTrial = license.trialEndsAt && license.trialEndsAt > Date.now();
+    // During a free trial the first charge is when the trial ends, so say so.
+    document.getElementById('proExpiresLabel').textContent = onTrial ? 'Free trial ends:' : 'Renews:';
+    if (onTrial) {
+      proExpires.textContent = `${longDate(license.trialEndsAt)} (your plan and full allowance start then)`;
     } else {
-      proExpires.textContent = '—';
+      proExpires.textContent = license.expiresAt ? longDate(license.expiresAt) : '—';
     }
 
     proLicenseDisplay.textContent = license.key;
