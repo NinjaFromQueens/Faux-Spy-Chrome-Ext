@@ -103,6 +103,7 @@ a { color: var(--gold); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 .foot { text-align: center; color: var(--text-tertiary); font-size: 0.85rem; }
+.have-key { text-align: center; margin: -12px 0 24px; }
 
 @media (max-width: 480px) {
   body { padding: 32px 16px; }

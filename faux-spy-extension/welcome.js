@@ -13,3 +13,8 @@ if (isFirefox) {
 document.getElementById('openSettings').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
 });
+
+document.getElementById('enterKey').addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.runtime.openOptionsPage();
+});

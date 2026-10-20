@@ -395,15 +395,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function analyzeVideo(request, callback) {
   try {
-    const { license, userId } = await chrome.storage.local.get(['license', 'userId']);
+    let { license, userId } = await chrome.storage.local.get(['license', 'userId']);
 
     // Gate: Pro + Video feature required
     if (!license?.features?.videoDetection) {
       return callback({ error: 'VIDEO_FEATURE_REQUIRED' });
     }
 
-    // Optimistic local token pre-check
-    const totalTokens = (license.tokenBalance || 0) + (license.topupBalance || 0);
+    // Optimistic local token pre-check, confirmed with the server before
+    // refusing in case the cached balance predates a top-up or renewal.
+    const tokensOf = l => (l?.tokenBalance || 0) + (l?.topupBalance || 0);
+    if (tokensOf(license) < 10) {
+      license = await refreshLicense();
+      if (!license?.features?.videoDetection) return callback({ error: 'VIDEO_FEATURE_REQUIRED' });
+    }
+    const totalTokens = tokensOf(license);
     if (totalTokens < 10) {
       return callback({
         error: 'TOKENS_EXHAUSTED',
@@ -905,14 +911,26 @@ async function incrementStat(statName) {
 // Message handlers
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'openUpgrade') {
-    const fallback = chrome.runtime.getURL('upgrade.html');
-    const url = (typeof request.url === 'string' &&
-                (request.url.startsWith('https://fauxspy.com/') || request.url.startsWith('https://www.fauxspy.com/')))
-      ? request.url
-      : fallback;
-    chrome.tabs.create({ url });
+    openUpgrade(request.url);
     sendResponse();
     return false;
+  }
+
+  if (request.action === 'activateLicense') {
+    if (!isTrustedLicenseSender(sender)) {
+      sendResponse({ success: false, error: 'Not allowed' });
+      return false;
+    }
+    activateLicense(request.key).then(sendResponse, () => sendResponse({ success: false, error: 'Activation failed' }));
+    return true;
+  }
+
+  if (request.action === 'refreshLicense') {
+    refreshLicense({ force: request.force === true }).then(
+      license => sendResponse({ license }),
+      () => sendResponse({ license: null })
+    );
+    return true;
   }
 
   if (request.action === 'openPortal') {
@@ -928,6 +946,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Async response
   }
 });
+
+// Every upgrade and buy-tokens prompt lands on fauxspy.com, the one pricing
+// page that's kept current.
+async function openUpgrade(requested) {
+  let url;
+  try { url = new URL(requested); } catch { url = null; }
+  if (!url || url.protocol !== 'https:' || !['fauxspy.com', 'www.fauxspy.com'].includes(url.hostname)) {
+    url = new URL(`${BACKEND_URL}/pro`);
+  }
+  // The token page needs the key to show the balance. It's added here, not
+  // by the content script, so the key is never written into a web page.
+  if (url.pathname === '/buy-tokens') {
+    const { license } = await chrome.storage.local.get('license');
+    if (license?.isPro && license.key) url.searchParams.set('key', license.key);
+  }
+  chrome.tabs.create({ url: url.href });
+}
+
+// Activation requests come from the settings page, or from the content
+// script on fauxspy.com/success handing over a just-purchased key.
+function isTrustedLicenseSender(sender) {
+  if (sender.id !== chrome.runtime.id) return false;
+  const url = sender.url || sender.tab?.url || '';
+  if (url.startsWith(chrome.runtime.getURL(''))) return true;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && (u.hostname === 'fauxspy.com' || u.hostname === 'www.fauxspy.com');
+  } catch {
+    return false;
+  }
+}
+
+// The cached token balance only refreshes once a day, so before telling
+// someone they're out of tokens, ask the server: they may have just topped
+// up or renewed. At most once a minute unless the user asks (Settings).
+const LICENSE_REFRESH_MIN_MS = 60 * 1000;
+let lastLicenseRefresh = 0;
+async function refreshLicense({ force = false } = {}) {
+  if (!force && Date.now() - lastLicenseRefresh < LICENSE_REFRESH_MIN_MS) {
+    return (await chrome.storage.local.get('license')).license;
+  }
+  lastLicenseRefresh = Date.now();
+  return revalidateLicense();
+}
 
 // Open customer portal for Pro users
 async function openCustomerPortal() {

@@ -76,6 +76,8 @@ const proLicenseDisplay = document.getElementById('proLicenseDisplay');
 const videoStatusBox = document.getElementById('videoStatusBox');
 const videoUpgradeHint = document.getElementById('videoUpgradeHint');
 const videoTokenBalance = document.getElementById('videoTokenBalance');
+const proTokenBalance = document.getElementById('proTokenBalance');
+const refreshLicenseLink = document.getElementById('refreshLicenseLink');
 
 // Show appropriate license state based on stored license
 async function refreshLicenseUI() {
@@ -93,16 +95,21 @@ async function refreshLicenseUI() {
     proPlan.textContent = planLabel;
     proEmail.textContent = license.email || '—';
 
+    const tokens = license.tokenBalance !== undefined
+      ? `${((license.tokenBalance || 0) + (license.topupBalance || 0)).toLocaleString()} tokens`
+      : '—';
+    proTokenBalance.textContent = tokens;
+    // The token page needs the key to show the balance and add tokens to it.
+    const buyUrl = `https://www.fauxspy.com/buy-tokens?key=${encodeURIComponent(license.key)}`;
+    document.getElementById('buyTokensLink').href = buyUrl;
+    document.getElementById('buyVideoTokensLink').href = buyUrl;
+
     // Video detection status
     if (videoStatusBox && videoUpgradeHint) {
       if (hasVideo) {
         videoStatusBox.style.display = 'block';
         videoUpgradeHint.style.display = 'none';
-        if (videoTokenBalance) {
-          videoTokenBalance.textContent = license.tokensRemaining != null
-            ? `${license.tokensRemaining} tokens`
-            : '—';
-        }
+        if (videoTokenBalance) videoTokenBalance.textContent = tokens;
       } else {
         videoStatusBox.style.display = 'none';
         videoUpgradeHint.style.display = 'block';
@@ -143,54 +150,20 @@ if (activateLicenseBtn) {
     licenseStatus.innerHTML = '';
 
     try {
-      const response = await fetch('https://www.fauxspy.com/api/validate-license', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseKey: key.toUpperCase() })
-      });
+      // Same code path as the automatic hand-off from the checkout page.
+      const result = await chrome.runtime.sendMessage({ action: 'activateLicense', key });
 
-      const data = await response.json();
-
-      if (!data.valid) {
-        showLicenseStatus('❌ ' + (data.message || data.error || 'License invalid'), 'error', 8000);
+      if (!result?.success) {
+        showLicenseStatus('❌ ' + (result?.error || 'License could not be activated'), 'error', 8000);
         return;
       }
 
-      // Save license
-      const license = {
-        isPro: true,
-        key: key.toUpperCase(),
-        plan: data.plan,
-        email: data.email,
-        expiresAt: data.expiresAt,
-        activatedAt: Date.now(),
-        features: data.features,
-        tokenBalance: data.tokenBalance ?? 0,
-        topupBalance: data.topupBalance ?? 0,
-        tokensIncluded: data.tokensIncluded ?? 200,
-        limits: {
-          scansPerDay: -1,
-          caching: true,
-          batchScanning: true,
-          maxBatchSize: 50
-        }
-      };
-
-      await chrome.storage.local.set({
-        license,
-        lastLicenseCheck: Date.now()
-      });
-
       showLicenseStatus('✅ Pro activated! Welcome, Secret Agent.', 'success', 5000);
-
       licenseKeyInput.value = '';
-
-      // Refresh UI to show Pro state
-      setTimeout(() => refreshLicenseUI(), 1000);
-
+      // The storage listener below switches the page to the Pro state.
     } catch (error) {
       console.error('Activation error:', error);
-      showLicenseStatus('❌ Network error. Check your connection.', 'error');
+      showLicenseStatus('❌ Something went wrong. Try again in a moment.', 'error');
     } finally {
       activateLicenseBtn.disabled = false;
       activateLicenseBtn.textContent = '🔓 Activate Pro';
@@ -226,6 +199,30 @@ if (deactivateLicenseBtn) {
     setTimeout(() => refreshLicenseUI(), 1000);
   });
 }
+
+// Re-check the plan and token balance with the server now, e.g. right after
+// a top-up, instead of waiting for the daily check.
+if (refreshLicenseLink) {
+  refreshLicenseLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    refreshLicenseLink.textContent = 'Refreshing…';
+    try {
+      const { license } = await chrome.runtime.sendMessage({ action: 'refreshLicense', force: true });
+      if (license && !license.isPro) {
+        showLicenseStatus('Your Pro plan is no longer active' + (license.previousIssue ? ` (${license.previousIssue})` : '') + '.', 'error', 8000);
+      }
+    } catch {
+      showLicenseStatus2('❌ Could not reach Faux Spy. Try again in a moment.', 'error', 5000);
+    } finally {
+      refreshLicenseLink.textContent = 'Refresh';
+    }
+  });
+}
+
+// Activation can also happen from the checkout page in another tab.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.license) refreshLicenseUI();
+});
 
 // Helper: format license key as user types
 if (licenseKeyInput) {

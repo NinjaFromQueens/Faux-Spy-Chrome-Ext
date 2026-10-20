@@ -836,10 +836,20 @@ async function checkUsageLimit() {
     return { allowed: true, remaining: 3, isPro: false, limit: 3, scans: 0 };
   }
 
+  const tokensOf = l => (l.tokenBalance || 0) + (l.topupBalance || 0);
+  if (license?.isPro && license.tokenBalance !== undefined && tokensOf(license) <= 0) {
+    // The cached balance only refreshes daily. Ask the server before saying
+    // "out of tokens": a top-up or renewal may have just come through.
+    try {
+      const reply = await chrome.runtime.sendMessage({ action: 'refreshLicense' });
+      if (reply?.license) license = reply.license;
+    } catch (_ctxErr) { /* stale context: go with the cached license */ }
+  }
+
   if (license?.isPro) {
     // Token system active: check local cache before server round-trip
     if (license.tokenBalance !== undefined) {
-      const total = (license.tokenBalance || 0) + (license.topupBalance || 0);
+      const total = tokensOf(license);
       if (total <= 0) {
         return {
           allowed: false,
@@ -868,7 +878,9 @@ async function checkUsageLimit() {
     remaining: Math.max(0, limit - scans),
     isPro: false,
     limit,
-    scans
+    scans,
+    message: `You've used today's ${limit} free scans. Pro gives you 200 a month.`,
+    upgradeUrl: 'https://www.fauxspy.com/pro'
   };
 }
 
@@ -1046,15 +1058,12 @@ function showUpgradePrompt(img, usageCheck) {
   const label = document.createElement('span');
   label.textContent = labelText;
   badge.append(star, label);
-  badge.title = `${usageCheck.message}\nClick for details`;
+  badge.title = `${usageCheck.message || 'Upgrade to keep scanning'}\nClick to see plans`;
   badge.style.cursor = 'pointer';
 
   badge.addEventListener('click', (e) => {
     e.stopPropagation();
-    chrome.runtime.sendMessage({
-      action: 'openUpgrade',
-      url: usageCheck.upgradeUrl || null
-    });
+    openUpgrade(usageCheck.upgradeUrl);
   });
 
   wrapper.appendChild(badge);
@@ -1738,9 +1747,13 @@ function showVideoMessage(video, { icon, title, body, linkUrl, linkLabel, color 
     <div style="font-size:1.5rem;margin-bottom:6px;">${icon}</div>
     <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(title)}</div>
     <div style="font-size:0.85rem;opacity:0.85;">${escapeHtml(body)}</div>
-    ${safeLink(linkUrl) ? `<a href="${escapeHtml(safeLink(linkUrl))}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:0.85rem;font-weight:600;color:inherit;">${escapeHtml(linkLabel || 'Learn more')}</a>` : ''}
+    ${safeLink(linkUrl) ? `<a class="ai-panel-link" href="${escapeHtml(safeLink(linkUrl))}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:0.85rem;font-weight:600;color:inherit;">${escapeHtml(linkLabel || 'Learn more')}</a>` : ''}
   `;
   panel.querySelector('.ai-panel-close').addEventListener('click', () => panel.remove());
+  panel.querySelector('.ai-panel-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openUpgrade(safeLink(linkUrl));
+  });
   positionVideoPanel(panel, video);
   document.body.appendChild(panel);
 }
@@ -2218,10 +2231,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // START
 // ============================================================================
 
+listenForCheckoutHandoff();
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeDetector);
 } else {
   initializeDetector();
+}
+
+// After checkout, fauxspy.com/success hands the new license key to the
+// extension so the buyer doesn't have to copy and paste it. The background
+// still checks the key with the server, so a forged message can't grant Pro.
+function listenForCheckoutHandoff() {
+  if (!/^(www\.)?fauxspy\.com$/.test(location.hostname) || location.pathname !== '/success') return;
+
+  let requestedKey = null;
+  window.addEventListener('message', async (event) => {
+    if (event.source !== window || event.origin !== location.origin) return;
+    const data = event.data;
+    if (data?.source !== 'fauxspy-page' || data.type !== 'FAUXSPY_ACTIVATE' || typeof data.key !== 'string') return;
+    if (data.key === requestedKey) return;
+    requestedKey = data.key;
+
+    let reply = null;
+    try {
+      reply = await chrome.runtime.sendMessage({ action: 'activateLicense', key: data.key });
+    } catch (_ctxErr) { /* extension was updated or reloaded; the page falls back to manual steps */ }
+    window.postMessage(reply?.success
+      ? { source: 'fauxspy-extension', type: 'FAUXSPY_ACTIVATED', plan: reply.license?.plan }
+      : { source: 'fauxspy-extension', type: 'FAUXSPY_ACTIVATE_FAILED', error: reply?.error || 'Activation failed' },
+    location.origin);
+  });
+  // The page may have posted before this script loaded; this tells it to ask again.
+  window.postMessage({ source: 'fauxspy-extension', type: 'FAUXSPY_EXTENSION_READY' }, location.origin);
+}
+
+// Upgrade and buy-tokens links open through the background, which adds the
+// license key for the token page without it ever touching this page's DOM.
+function openUpgrade(url) {
+  const fallback = () => window.open(url || 'https://www.fauxspy.com/pro', '_blank', 'noopener');
+  try {
+    chrome.runtime.sendMessage({ action: 'openUpgrade', url: url || null }).catch(fallback);
+  } catch (_ctxErr) {
+    fallback();
+  }
 }
 
 // ============================================================================

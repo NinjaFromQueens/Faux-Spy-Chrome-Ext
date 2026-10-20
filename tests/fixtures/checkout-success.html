@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Checkout success (test stand-in for fauxspy.com/success)</title>
+</head>
+<body>
+  <!-- Speaks the same postMessage protocol as the real success page. Served by
+       e2e.js at https://www.fauxspy.com/success so the content script runs. -->
+  <p id="key">FAUX-ABCD-EFGH-JKMN-PQRS</p>
+  <script>
+    window.__replies = [];
+    function ask() {
+      window.postMessage({ source: 'fauxspy-page', type: 'FAUXSPY_ACTIVATE', key: document.getElementById('key').textContent }, location.origin);
+    }
+    window.addEventListener('message', function (e) {
+      if (e.source !== window || !e.data || e.data.source !== 'fauxspy-extension') return;
+      window.__replies.push(e.data.type);
+      if (e.data.type === 'FAUXSPY_EXTENSION_READY') ask();
+    });
+    ask();
+  </script>
+</body>
+</html>

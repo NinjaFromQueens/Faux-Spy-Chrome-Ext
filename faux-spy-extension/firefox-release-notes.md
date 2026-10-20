@@ -1,7 +1,40 @@
-# Firefox Add-ons (AMO) — 1.10.0 submission text
+# Firefox Add-ons (AMO) — submission text
+
+Built from source by `node build-extension.js`; `npx web-ext lint` reports 0 errors.
+
+# 1.11.0
+
+Upload `faux-spy-firefox-v1.11.0.zip` once 1.10.0 is approved, then paste each section into the matching field.
+
+## Release notes (Version → Release notes)
+
+What's new in 1.11.0
+
+Upgrading to Pro
+- Buy Pro on fauxspy.com and it switches on in the extension by itself. No more copying and pasting a license key.
+- Bought a top-up or just renewed? Faux Spy checks with our server before saying you're out of tokens, so new tokens work right away.
+- Settings shows your tokens left, with "Refresh" and "Buy more" links, and a link to get a lost key by email.
+- Every upgrade prompt now opens the same, current pricing page on fauxspy.com.
+
+Fixes
+- The "Upgrade" badge shown at the daily free limit no longer says "undefined" when you hover it.
+- The welcome page has a link for people who already bought Pro.
+
+## Notes to Reviewer (Version → Notes to Reviewer)
+
+Changes since 1.10.0 are all in the upgrade flow. No new permissions, no new data collection, and no new hosts.
+
+- License hand-off after checkout (content.js, listenForCheckoutHandoff): only on https://www.fauxspy.com/success (or fauxspy.com/success), the content script accepts a window.postMessage from that page carrying the license key the customer just bought. It checks event.source, event.origin and the message type. It passes the key to the background, which checks it with https://www.fauxspy.com/api/validate-license exactly as when the user pastes it in Settings. It does nothing on any other site.
+- Token balance re-check (background.js, refreshLicense): when the cached balance is 0, the background calls validate-license once (at most once a minute) before showing "out of tokens". It's the same request the add-on already makes daily.
+- The in-extension upgrade.html page was removed; upgrade prompts open https://www.fauxspy.com/pro in a new tab. Links to the token page get the user's license key added by the background, so the key is never written into a website's page.
+
+How to test Pro (optional): paid features need a license key. [Optional: paste a test key here.]
+
+---
+
+# 1.10.0
 
 Upload `faux-spy-firefox-v1.10.0.zip`, then paste each section into the matching field.
-Built from source by `node build-extension.js`; `npx web-ext lint` reports 0 errors.
 
 ---
 

@@ -23,8 +23,6 @@ faux-spy-extension/
 ├── settings.html          # HQ Settings page
 ├── settings.js            # Settings logic (license activation)
 ├── license.js             # License management module
-├── upgrade.html           # Pro upgrade page
-├── upgrade.js             # Upgrade page logic
 └── icons/                 # Extension icons (16, 48, 128px)
 ```
 

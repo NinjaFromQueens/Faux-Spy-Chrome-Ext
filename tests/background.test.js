@@ -39,7 +39,7 @@ function makeEnv(browser, { ortStub = null, dataConsent = false } = {}) {
   };
   const chrome = {
     runtime: {
-      onMessage: evt('message'), onInstalled: evt('installed'), onStartup: evt('startup'), onConnect: evt('other'),
+      id: 'x', onMessage: evt('message'), onInstalled: evt('installed'), onStartup: evt('startup'), onConnect: evt('other'),
       getURL: p => `${browser === 'firefox' ? 'moz-extension' : 'chrome-extension'}://x/${p}`, getManifest: () => manifest,
       setUninstallURL: u => { uninstallUrl = u; }, lastError: null,
     },
@@ -85,10 +85,10 @@ function makeEnv(browser, { ortStub = null, dataConsent = false } = {}) {
       run(manifest.background.service_worker);
     }
   };
-  env.send = msg => new Promise(resolve => {
+  env.send = (msg, sender = {}) => new Promise(resolve => {
     let done = false;
     for (const l of listeners.message) {
-      const keepOpen = l(msg, {}, r => { if (!done) { done = true; resolve(r); } });
+      const keepOpen = l(msg, sender, r => { if (!done) { done = true; resolve(r); } });
       if (keepOpen === true) return;
     }
     if (!done) resolve(undefined);
@@ -299,6 +299,71 @@ const keepAlive = setInterval(() => {}, 1000);
   await video('video 403 expired -> LICENSE_EXPIRED + message, license re-checked', 403, { error: 'LICENSE_EXPIRED', message: 'Your subscription has expired. Renew at fauxspy.com/pro.' },
     (r, env) => r.error === 'LICENSE_EXPIRED' && /expired/.test(r.message) && env.storage.license.isPro === false);
   await video('video 502 with non-JSON body -> INTERNAL_ERROR with status', 502, undefined, r => r.error === 'INTERNAL_ERROR' && /502/.test(r.message));
+
+  {
+    // Cached balance says 5 (< 10 per video), but the user has since topped up.
+    const env = freshEnv({ ...PRO, tokenBalance: 5 });
+    env.fetchImpl = async url => url.includes('validate-license')
+      ? json(200, { valid: true, plan: 'video-monthly', tokenBalance: 5, topupBalance: 200, features: { videoDetection: true } })
+      : json(200, { success: true, isAIVideo: false, aiScore: 0.1, tokenBalance: 5, topupBalance: 190 });
+    const r = await env.send({ action: 'analyzeVideo', videoData: { src: 'https://cdn.example.com/v.mp4' } });
+    check('video: low cached balance is re-checked with the server before refusing', !r.error && env.fetchLog.some(u => u.includes('validate-license')) && env.fetchLog.some(u => u.includes('detect-video')), { r, fetches: env.fetchLog });
+  }
+
+  // ── Activation (settings page + checkout hand-off) ───────────────────────
+  const SETTINGS = { id: 'x', url: 'chrome-extension://x/settings.html' };
+  const SUCCESS_TAB = { id: 'x', url: 'https://www.fauxspy.com/success', tab: { url: 'https://www.fauxspy.com/success' } };
+  const validReply = json(200, { valid: true, plan: 'monthly', email: 'a@b.co', expiresAt: 1, tokenBalance: 200, topupBalance: 0, tokensIncluded: 200, features: { videoDetection: false } });
+  {
+    const env = freshEnv({ isPro: false, plan: 'free' });
+    env.fetchImpl = async () => validReply;
+    const r = await env.send({ action: 'activateLicense', key: ' faux-abcd-efgh-jkmn-pqrs ' }, SETTINGS);
+    check('settings page activates a key (normalized) and stores Pro', r.success && env.storage.license.isPro && env.storage.license.key === 'FAUX-ABCD-EFGH-JKMN-PQRS' && env.storage.license.tokenBalance === 200, { r, license: env.storage.license });
+  }
+  {
+    const env = freshEnv({ isPro: false, plan: 'free' });
+    env.fetchImpl = async () => validReply;
+    const r = await env.send({ action: 'activateLicense', key: 'FAUX-ABCD-EFGH-JKMN-PQRS' }, SUCCESS_TAB);
+    check('checkout success page can hand over a key', r.success && env.storage.license.isPro, r);
+  }
+  {
+    const env = freshEnv({ isPro: false, plan: 'free' });
+    env.fetchImpl = async () => validReply;
+    const r = await env.send({ action: 'activateLicense', key: 'FAUX-ABCD-EFGH-JKMN-PQRS' }, { id: 'x', url: 'https://evil.example/success', tab: { url: 'https://evil.example/success' } });
+    check('other sites cannot activate a key', !r.success && !env.storage.license.isPro && env.fetchLog.length === 0, r);
+  }
+  {
+    const env = freshEnv({ isPro: false, plan: 'free' });
+    env.fetchImpl = async () => json(404, { valid: false, error: 'License not found', message: 'This license key does not exist. Check for typos.' });
+    const r = await env.send({ action: 'activateLicense', key: 'FAUX-ABCD-EFGH-JKMN-PQRS' }, SETTINGS);
+    check('unknown key -> server message, stays free', !r.success && /does not exist/.test(r.error) && !env.storage.license.isPro, r);
+    const bad = await env.send({ action: 'activateLicense', key: 'FAUX-123456-ABCDEF' }, SETTINGS);
+    check('malformed key rejected without a server call', !bad.success && /FAUX-XXXX/.test(bad.error) && env.fetchLog.length === 1, bad);
+  }
+
+  // ── Refreshing a stale token balance ─────────────────────────────────────
+  {
+    const env = freshEnv({ ...PRO, tokenBalance: 0 });
+    let calls = 0;
+    env.fetchImpl = async () => { calls++; return json(200, { valid: true, plan: 'monthly', tokenBalance: 200, topupBalance: 0, features: {} }); };
+    const a = await env.send({ action: 'refreshLicense' });
+    const b = await env.send({ action: 'refreshLicense' });
+    check('refreshLicense returns the server balance', a.license.tokenBalance === 200 && b.license.tokenBalance === 200, { a, b });
+    check('refreshLicense hits the server at most once a minute', calls === 1, calls);
+    await env.send({ action: 'refreshLicense', force: true });
+    check('Settings "Refresh" bypasses the throttle', calls === 2, calls);
+  }
+
+  // ── Upgrade / buy-tokens links ───────────────────────────────────────────
+  {
+    const env = freshEnv();
+    const open = async url => { env.tabsCreated.length = 0; await env.send({ action: 'openUpgrade', url }); await sleep(10); return env.tabsCreated[0]; };
+    check('buy-tokens link gets the license key added by the background', (await open('https://www.fauxspy.com/buy-tokens')) === 'https://www.fauxspy.com/buy-tokens?key=FAUX-1111-2222-3333-4444');
+    check('upgrade link opens as-is', (await open('https://www.fauxspy.com/pro')) === 'https://www.fauxspy.com/pro');
+    check('missing or foreign URLs open fauxspy.com/pro', (await open(null)) === 'https://www.fauxspy.com/pro' && (await open('https://evil.example/pro')) === 'https://www.fauxspy.com/pro');
+    env.storage.license = { isPro: false, plan: 'free' };
+    check('free users get no key in the buy-tokens URL', (await open('https://www.fauxspy.com/buy-tokens')) === 'https://www.fauxspy.com/buy-tokens');
+  }
 
   clearInterval(keepAlive);
   const failed = results.filter(ok => !ok).length;

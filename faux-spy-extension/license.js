@@ -53,9 +53,10 @@ async function activateLicense(licenseKey) {
     const response = await fetch(`${BACKEND_URL}/api/validate-license`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: cleanKey })
+      body: JSON.stringify({ licenseKey: cleanKey }),
+      signal: AbortSignal.timeout(VALIDATE_TIMEOUT_MS)
     });
-    
+
     const data = await response.json();
     
     if (!data.valid) {
